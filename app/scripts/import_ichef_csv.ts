@@ -291,6 +291,7 @@ async function writeToSheets(
     console.log(`Writing ${empRecords.length} records for ${summary.employee}...`);
     await writeAnalyzedRecords(yyyyMm, summary.employee, empRecords);
     await writeSummaryRow(yyyyMm, summary);
+    await new Promise((r) => setTimeout(r, 2000)); // avoid Sheets read quota
   }
 }
 
