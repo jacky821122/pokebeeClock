@@ -38,11 +38,7 @@ export async function POST(req: NextRequest) {
     };
 
     await appendPunch(punch);
-
-    // Re-analyze in background — don't await so punch response is fast
-    reanalyzeEmployee(employee, punch.server_ts).catch((err) =>
-      console.error("reanalyze failed:", err)
-    );
+    await reanalyzeEmployee(employee, punch.server_ts);
 
     return NextResponse.json({ ok: true, server_ts: punch.server_ts });
   } catch (err) {
