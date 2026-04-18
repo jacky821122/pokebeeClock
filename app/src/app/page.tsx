@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import EmployeeGrid from "@/components/EmployeeGrid";
 import PinPad from "@/components/PinPad";
 import type { Employee } from "@/types";
@@ -87,6 +88,11 @@ export default function Home() {
       <main className="mx-auto w-full max-w-lg px-4 py-6">
         {view === "grid" && (
           <>
+            <div className="mb-4 flex justify-end">
+              <Link href="/amend" className="text-sm text-stone-500 underline-offset-2 hover:underline">
+                補登申請
+              </Link>
+            </div>
             <p className="mb-4 text-center text-sm text-gray-500">點選你的名字打卡</p>
             {loadingEmployees ? (
               <p className="text-center text-gray-400">載入中…</p>

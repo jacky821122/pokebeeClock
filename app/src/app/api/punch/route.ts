@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { verifyPin, appendPunch } from "@/lib/sheets";
+import { reanalyzeEmployee } from "@/lib/analyzer_bridge";
 import type { Punch } from "@/types";
 
 function nowTaipei(): string {
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest) {
     };
 
     await appendPunch(punch);
+
+    // Re-analyze in background — don't await so punch response is fast
+    reanalyzeEmployee(employee, punch.server_ts).catch((err) =>
+      console.error("reanalyze failed:", err)
+    );
+
     return NextResponse.json({ ok: true, server_ts: punch.server_ts });
   } catch (err) {
     console.error(err);
