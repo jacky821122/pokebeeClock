@@ -1,0 +1,10 @@
+{
+  "name": "阿姨",
+  "isFullTime": false,
+  "events": [
+    {
+      "kind": "clock-out-no-in",
+      "timestamp": "2026-02-26 14:03:00"
+    }
+  ]
+}

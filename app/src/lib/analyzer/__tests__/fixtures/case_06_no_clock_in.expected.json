@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "employee": "阿姨",
+    "is_full_time": false,
+    "normal_hours": 4.0,
+    "overtime_hours": 0.0,
+    "specials": [
+      "2026-02-26 早班，無上班紀錄，推算計為 4 小時"
+    ],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "阿姨",
+      "date": "2026-02-26",
+      "shift": "早班",
+      "in_raw": "",
+      "in_norm": "",
+      "out_raw": "2026-02-26 14:03:00",
+      "out_norm": "2026-02-26 14:00",
+      "normal_hours": 4.0,
+      "overtime_hours": 0.0,
+      "note": "早班，無上班紀錄，推算計為 4 小時"
+    }
+  ]
+}

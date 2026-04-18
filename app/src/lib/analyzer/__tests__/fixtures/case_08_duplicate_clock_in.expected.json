@@ -1,0 +1,29 @@
+{
+  "summary": {
+    "employee": "林孟儒",
+    "is_full_time": false,
+    "normal_hours": 8.0,
+    "overtime_hours": 0.5,
+    "specials": [
+      "2026-02-05 重複 clock-in（<=60秒），丟棄後者",
+      "2026-02-05 早班，正常時數 8.5 小時（非 4 小時）"
+    ],
+    "overtime_specials": [
+      "2026-02-05 日總時數 8.5 小時，計為 0.5 小時加班"
+    ]
+  },
+  "records": [
+    {
+      "employee": "林孟儒",
+      "date": "2026-02-05",
+      "shift": "早班",
+      "in_raw": "2026-02-05 10:55:02",
+      "in_norm": "2026-02-05 11:00",
+      "out_raw": "2026-02-05 19:47:48",
+      "out_norm": "2026-02-05 19:30",
+      "normal_hours": 8.0,
+      "overtime_hours": 0.5,
+      "note": "早班，正常時數 8.5 小時（非 4 小時）"
+    }
+  ]
+}

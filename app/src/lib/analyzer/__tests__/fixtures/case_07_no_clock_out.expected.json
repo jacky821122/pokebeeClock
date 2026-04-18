@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "employee": "許凱惟",
+    "is_full_time": false,
+    "normal_hours": 4.0,
+    "overtime_hours": 0.0,
+    "specials": [
+      "2026-02-07 早班，無下班紀錄，計為 4 小時（default）"
+    ],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "許凱惟",
+      "date": "2026-02-07",
+      "shift": "早班",
+      "in_raw": "2026-02-07 10:55:00",
+      "in_norm": "2026-02-07 11:00",
+      "out_raw": "",
+      "out_norm": "",
+      "normal_hours": 4.0,
+      "overtime_hours": 0.0,
+      "note": "早班，無下班紀錄，計為 4 小時（default）"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "employee": "許凱惟",
+    "is_full_time": false,
+    "normal_hours": 8.0,
+    "overtime_hours": 0.0,
+    "specials": [
+      "2026-02-02 全日連續班（強制拆分）"
+    ],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "許凱惟",
+      "date": "2026-02-02",
+      "shift": "全日連續班",
+      "in_raw": "2026-02-02 10:00:00",
+      "in_norm": "2026-02-02 10:00",
+      "out_raw": "2026-02-02 20:00:00",
+      "out_norm": "2026-02-02 20:00",
+      "normal_hours": 8.0,
+      "overtime_hours": 0.0,
+      "note": "全日連續班（強制拆分）"
+    }
+  ]
+}

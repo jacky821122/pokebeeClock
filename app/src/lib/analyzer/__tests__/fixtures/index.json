@@ -1,0 +1,13 @@
+[
+  "case_01_full_time_normal",
+  "case_02_full_time_overtime",
+  "case_03_pt_early_4hr",
+  "case_04_pt_late_shift_1",
+  "case_04b_pt_late_shift_2",
+  "case_05_full_day_split",
+  "case_06_no_clock_in",
+  "case_07_no_clock_out",
+  "case_08_duplicate_clock_in",
+  "case_09_pt_daily_overtime",
+  "case_10_early_no_out_then_late"
+]

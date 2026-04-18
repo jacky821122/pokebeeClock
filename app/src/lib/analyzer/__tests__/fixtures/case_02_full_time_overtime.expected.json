@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "employee": "小王叭",
+    "is_full_time": true,
+    "normal_hours": 8.0,
+    "overtime_hours": 1.0,
+    "specials": [
+      "2026-02-03 下班 21:00，計為 1 小時加班"
+    ],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "小王叭",
+      "date": "2026-02-03",
+      "shift": "正職",
+      "in_raw": "2026-02-03 10:00:00",
+      "in_norm": "2026-02-03 10:00",
+      "out_raw": "2026-02-03 21:09:00",
+      "out_norm": "2026-02-03 21:00",
+      "normal_hours": 8.0,
+      "overtime_hours": 1.0,
+      "note": "下班 21:00，計為 1 小時加班"
+    }
+  ]
+}

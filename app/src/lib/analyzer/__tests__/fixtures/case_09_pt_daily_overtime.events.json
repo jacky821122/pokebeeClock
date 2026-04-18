@@ -1,0 +1,22 @@
+{
+  "name": "員工C",
+  "isFullTime": false,
+  "events": [
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-11 10:00:00"
+    },
+    {
+      "kind": "clock-out",
+      "timestamp": "2026-02-11 14:30:00"
+    },
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-11 16:00:00"
+    },
+    {
+      "kind": "clock-out",
+      "timestamp": "2026-02-11 21:00:00"
+    }
+  ]
+}

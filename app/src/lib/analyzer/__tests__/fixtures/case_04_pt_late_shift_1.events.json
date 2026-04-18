@@ -1,0 +1,14 @@
+{
+  "name": "林孟儒",
+  "isFullTime": false,
+  "events": [
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-07 16:07:00"
+    },
+    {
+      "kind": "clock-out",
+      "timestamp": "2026-02-07 20:30:00"
+    }
+  ]
+}

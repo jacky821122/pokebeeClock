@@ -1,0 +1,14 @@
+{
+  "name": "許凱惟",
+  "isFullTime": false,
+  "events": [
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-07 10:55:00"
+    },
+    {
+      "kind": "no-clock-out",
+      "timestamp": null
+    }
+  ]
+}

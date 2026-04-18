@@ -1,0 +1,24 @@
+{
+  "summary": {
+    "employee": "阿姨",
+    "is_full_time": false,
+    "normal_hours": 4.0,
+    "overtime_hours": 0.0,
+    "specials": [],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "阿姨",
+      "date": "2026-02-01",
+      "shift": "早班",
+      "in_raw": "2026-02-01 10:00:00",
+      "in_norm": "2026-02-01 10:00",
+      "out_raw": "2026-02-01 14:02:00",
+      "out_norm": "2026-02-01 14:00",
+      "normal_hours": 4.0,
+      "overtime_hours": 0.0,
+      "note": ""
+    }
+  ]
+}

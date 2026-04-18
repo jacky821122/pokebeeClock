@@ -1,0 +1,24 @@
+{
+  "summary": {
+    "employee": "員工B",
+    "is_full_time": false,
+    "normal_hours": 4.0,
+    "overtime_hours": 0.0,
+    "specials": [],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "員工B",
+      "date": "2026-02-10",
+      "shift": "晚班2",
+      "in_raw": "2026-02-10 16:30:00",
+      "in_norm": "2026-02-10 16:30",
+      "out_raw": "2026-02-10 20:30:00",
+      "out_norm": "2026-02-10 20:30",
+      "normal_hours": 4.0,
+      "overtime_hours": 0.0,
+      "note": ""
+    }
+  ]
+}

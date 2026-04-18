@@ -1,0 +1,14 @@
+{
+  "name": "小王叭",
+  "isFullTime": true,
+  "events": [
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-03 10:00:00"
+    },
+    {
+      "kind": "clock-out",
+      "timestamp": "2026-02-03 21:09:00"
+    }
+  ]
+}

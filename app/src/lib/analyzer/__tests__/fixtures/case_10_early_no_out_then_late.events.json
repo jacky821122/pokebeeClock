@@ -1,0 +1,22 @@
+{
+  "name": "江秉哲",
+  "isFullTime": false,
+  "events": [
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-14 10:00:00"
+    },
+    {
+      "kind": "no-clock-out",
+      "timestamp": null
+    },
+    {
+      "kind": "clock-in",
+      "timestamp": "2026-02-14 16:30:00"
+    },
+    {
+      "kind": "clock-out",
+      "timestamp": "2026-02-14 20:30:00"
+    }
+  ]
+}

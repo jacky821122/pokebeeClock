@@ -1,0 +1,38 @@
+{
+  "summary": {
+    "employee": "江秉哲",
+    "is_full_time": false,
+    "normal_hours": 8.0,
+    "overtime_hours": 0.0,
+    "specials": [
+      "2026-02-14 早班，無下班紀錄，計為 4 小時（default）"
+    ],
+    "overtime_specials": []
+  },
+  "records": [
+    {
+      "employee": "江秉哲",
+      "date": "2026-02-14",
+      "shift": "早班",
+      "in_raw": "2026-02-14 10:00:00",
+      "in_norm": "2026-02-14 10:00",
+      "out_raw": "",
+      "out_norm": "",
+      "normal_hours": 4.0,
+      "overtime_hours": 0.0,
+      "note": "早班，無下班紀錄，計為 4 小時（default）"
+    },
+    {
+      "employee": "江秉哲",
+      "date": "2026-02-14",
+      "shift": "晚班2",
+      "in_raw": "2026-02-14 16:30:00",
+      "in_norm": "2026-02-14 16:30",
+      "out_raw": "2026-02-14 20:30:00",
+      "out_norm": "2026-02-14 20:30",
+      "normal_hours": 4.0,
+      "overtime_hours": 0.0,
+      "note": ""
+    }
+  ]
+}
