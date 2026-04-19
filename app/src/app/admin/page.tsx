@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 
 interface EmployeeAdmin {
   name: string;
+  pin: string;
   role: "full_time" | "hourly";
   active: boolean;
-  has_pin: boolean;
+}
+
+interface DraftRow {
+  id: number;
+  selected: boolean;
+  name: string;
+  pin: string;
+  role: "full_time" | "hourly";
 }
 
 const SECRET_KEY = "pokebee_admin_secret";
@@ -26,14 +34,8 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/employees", {
       headers: { Authorization: `Bearer ${s}` },
     });
-    if (res.status === 401) {
-      setAuthError("密鑰錯誤");
-      return;
-    }
-    if (!res.ok) {
-      setAuthError(`驗證失敗（${res.status}）`);
-      return;
-    }
+    if (res.status === 401) return setAuthError("密鑰錯誤");
+    if (!res.ok) return setAuthError(`驗證失敗（${res.status}）`);
     sessionStorage.setItem(SECRET_KEY, s);
     setSecret(s);
   }
@@ -61,16 +63,22 @@ export default function AdminPage() {
     );
   }
 
-  return <EmployeesTable secret={secret} onSignOut={() => {
-    sessionStorage.removeItem(SECRET_KEY);
-    setSecret(null);
-  }} />;
+  return (
+    <EmployeesTable
+      secret={secret}
+      onSignOut={() => {
+        sessionStorage.removeItem(SECRET_KEY);
+        setSecret(null);
+      }}
+    />
+  );
 }
 
 function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () => void }) {
   const [employees, setEmployees] = useState<EmployeeAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [drafts, setDrafts] = useState<DraftRow[]>([]);
 
   async function load() {
     setLoading(true);
@@ -92,7 +100,7 @@ function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () =
     setTimeout(() => setMsg(null), 3000);
   }
 
-  async function save(name: string, patch: { pin?: string; role?: string; active?: boolean }) {
+  async function patchEmployee(name: string, patch: { pin?: string; role?: string; active?: boolean }) {
     const res = await fetch("/api/admin/employees", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
@@ -103,25 +111,52 @@ function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () =
       flash(data.error ?? "儲存失敗", false);
       return false;
     }
-    flash(`${name} 已儲存`, true);
+    flash(`${name} 已更新`, true);
     await load();
     return true;
   }
 
-  async function create(payload: { name: string; pin: string; role: string }) {
-    const res = await fetch("/api/admin/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      flash(data.error ?? "新增失敗", false);
-      return false;
+  function addDraft() {
+    setDrafts((d) => [...d, { id: Date.now() + Math.random(), selected: true, name: "", pin: "", role: "hourly" }]);
+  }
+
+  function updateDraft(id: number, patch: Partial<DraftRow>) {
+    setDrafts((d) => d.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function removeDraft(id: number) {
+    setDrafts((d) => d.filter((r) => r.id !== id));
+  }
+
+  async function submitSelectedDrafts() {
+    const selected = drafts.filter((d) => d.selected);
+    const invalid = selected.filter((d) => !d.name.trim() || !/^\d{4}$/.test(d.pin));
+    if (invalid.length > 0) {
+      flash(`有 ${invalid.length} 列資料不完整（姓名或 4 位 PIN）`, false);
+      return;
     }
-    flash(`${payload.name} 已新增`, true);
+    if (selected.length === 0) {
+      flash("未選取任何列", false);
+      return;
+    }
+
+    let ok = 0;
+    const errors: string[] = [];
+    for (const d of selected) {
+      const res = await fetch("/api/admin/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ name: d.name.trim(), pin: d.pin, role: d.role }),
+      });
+      const data = await res.json();
+      if (res.ok) ok++;
+      else errors.push(`${d.name}：${data.error ?? res.status}`);
+    }
+    flash(`新增 ${ok}/${selected.length} 成功${errors.length ? "；失敗：" + errors.join("，") : ""}`, errors.length === 0);
+    // Remove successful drafts (they're now in employees list)
+    const successNames = new Set(selected.slice(0, ok).map((d) => d.name.trim()));
+    setDrafts((d) => d.filter((r) => !successNames.has(r.name.trim())));
     await load();
-    return true;
   }
 
   return (
@@ -134,7 +169,11 @@ function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () =
       </div>
 
       {msg && (
-        <div className={`mb-3 rounded px-3 py-2 text-sm ${msg.ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+        <div
+          className={`mb-3 rounded px-3 py-2 text-sm ${
+            msg.ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}
+        >
           {msg.text}
         </div>
       )}
@@ -142,23 +181,66 @@ function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () =
       {loading ? (
         <p className="text-gray-400">載入中…</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-stone-300 text-left">
-              <th className="py-2 pr-3">名稱</th>
-              <th className="py-2 pr-3">新 PIN（留空不變）</th>
-              <th className="py-2 pr-3">身份</th>
-              <th className="py-2 pr-3">啟用</th>
-              <th className="py-2 pr-3">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((e) => (
-              <EmployeeRow key={e.name} employee={e} onSave={save} />
-            ))}
-            <NewEmployeeRow onCreate={create} />
-          </tbody>
-        </table>
+        <>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-stone-300 text-left">
+                <th className="py-2 pr-3">名稱</th>
+                <th className="py-2 pr-3">PIN</th>
+                <th className="py-2 pr-3">身份</th>
+                <th className="py-2 pr-3">啟用</th>
+                <th className="py-2 pr-3">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((e) => (
+                <EmployeeRow key={e.name} employee={e} onSave={patchEmployee} />
+              ))}
+            </tbody>
+          </table>
+
+          <div className="mt-8">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">新增員工</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={addDraft}
+                  className="rounded border border-stone-400 px-3 py-1 text-sm"
+                >
+                  + 新增一列
+                </button>
+                <button
+                  onClick={submitSelectedDrafts}
+                  disabled={drafts.filter((d) => d.selected).length === 0}
+                  className="rounded bg-green-700 px-3 py-1 text-sm text-white disabled:opacity-40"
+                >
+                  批次新增選取列（{drafts.filter((d) => d.selected).length}）
+                </button>
+              </div>
+            </div>
+
+            {drafts.length === 0 ? (
+              <p className="py-4 text-sm text-gray-400">尚無新增列。點「+ 新增一列」開始。</p>
+            ) : (
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-stone-300 text-left">
+                    <th className="py-2 pr-3 w-10">選取</th>
+                    <th className="py-2 pr-3">名稱</th>
+                    <th className="py-2 pr-3">PIN</th>
+                    <th className="py-2 pr-3">身份</th>
+                    <th className="py-2 pr-3">移除</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drafts.map((d) => (
+                    <DraftRowView key={d.id} draft={d} onChange={updateDraft} onRemove={removeDraft} />
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -171,39 +253,41 @@ function EmployeeRow({
   employee: EmployeeAdmin;
   onSave: (name: string, patch: { pin?: string; role?: string; active?: boolean }) => Promise<boolean>;
 }) {
-  const [pin, setPin] = useState("");
+  const [pin, setPin] = useState(employee.pin);
   const [role, setRole] = useState(employee.role);
   const [active, setActive] = useState(employee.active);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    setPin(employee.pin);
+    setRole(employee.role);
+    setActive(employee.active);
+  }, [employee.pin, employee.role, employee.active]);
+
+  const dirty = pin !== employee.pin || role !== employee.role || active !== employee.active;
+  const validPin = /^\d{4}$/.test(pin);
+  const canSave = dirty && validPin && !saving;
+
   async function submit() {
+    if (!canSave) return;
     setSaving(true);
     const patch: { pin?: string; role?: string; active?: boolean } = {};
-    if (pin) patch.pin = pin;
+    if (pin !== employee.pin) patch.pin = pin;
     if (role !== employee.role) patch.role = role;
     if (active !== employee.active) patch.active = active;
-    if (Object.keys(patch).length === 0) {
-      setSaving(false);
-      return;
-    }
-    const ok = await onSave(employee.name, patch);
-    if (ok) setPin("");
+    await onSave(employee.name, patch);
     setSaving(false);
   }
 
   return (
     <tr className="border-b border-stone-100">
-      <td className="py-2 pr-3">
-        <div>{employee.name}</div>
-        <div className="text-xs text-gray-400">{employee.has_pin ? "PIN 已設定" : "尚未設定 PIN"}</div>
-      </td>
+      <td className="py-2 pr-3">{employee.name}</td>
       <td className="py-2 pr-3">
         <input
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
           inputMode="numeric"
           maxLength={4}
-          placeholder="----"
           className="w-20 rounded border border-stone-300 px-2 py-1 tracking-widest"
         />
       </td>
@@ -223,8 +307,8 @@ function EmployeeRow({
       <td className="py-2 pr-3">
         <button
           onClick={submit}
-          disabled={saving}
-          className="rounded bg-stone-800 px-3 py-1 text-white disabled:opacity-50"
+          disabled={!canSave}
+          className="rounded bg-stone-800 px-3 py-1 text-white disabled:opacity-30"
         >
           {saving ? "…" : "儲存"}
         </button>
@@ -233,42 +317,36 @@ function EmployeeRow({
   );
 }
 
-function NewEmployeeRow({
-  onCreate,
+function DraftRowView({
+  draft,
+  onChange,
+  onRemove,
 }: {
-  onCreate: (payload: { name: string; pin: string; role: string }) => Promise<boolean>;
+  draft: DraftRow;
+  onChange: (id: number, patch: Partial<DraftRow>) => void;
+  onRemove: (id: number) => void;
 }) {
-  const [name, setName] = useState("");
-  const [pin, setPin] = useState("");
-  const [role, setRole] = useState<"full_time" | "hourly">("hourly");
-  const [saving, setSaving] = useState(false);
-
-  async function submit() {
-    if (!name.trim() || pin.length !== 4) return;
-    setSaving(true);
-    const ok = await onCreate({ name: name.trim(), pin, role });
-    if (ok) {
-      setName("");
-      setPin("");
-      setRole("hourly");
-    }
-    setSaving(false);
-  }
-
   return (
-    <tr className="bg-stone-50">
+    <tr className="border-b border-stone-100 bg-stone-50">
       <td className="py-2 pr-3">
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          type="checkbox"
+          checked={draft.selected}
+          onChange={(e) => onChange(draft.id, { selected: e.target.checked })}
+        />
+      </td>
+      <td className="py-2 pr-3">
+        <input
+          value={draft.name}
+          onChange={(e) => onChange(draft.id, { name: e.target.value })}
           placeholder="員工姓名"
           className="w-full rounded border border-stone-300 px-2 py-1"
         />
       </td>
       <td className="py-2 pr-3">
         <input
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          value={draft.pin}
+          onChange={(e) => onChange(draft.id, { pin: e.target.value.replace(/\D/g, "").slice(0, 4) })}
           inputMode="numeric"
           maxLength={4}
           placeholder="----"
@@ -277,22 +355,20 @@ function NewEmployeeRow({
       </td>
       <td className="py-2 pr-3">
         <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as "full_time" | "hourly")}
+          value={draft.role}
+          onChange={(e) => onChange(draft.id, { role: e.target.value as "full_time" | "hourly" })}
           className="rounded border border-stone-300 px-2 py-1"
         >
           <option value="full_time">正職</option>
           <option value="hourly">計時</option>
         </select>
       </td>
-      <td className="py-2 pr-3">—</td>
       <td className="py-2 pr-3">
         <button
-          onClick={submit}
-          disabled={saving || !name.trim() || pin.length !== 4}
-          className="rounded bg-green-700 px-3 py-1 text-white disabled:opacity-40"
+          onClick={() => onRemove(draft.id)}
+          className="text-sm text-red-600 hover:underline"
         >
-          {saving ? "…" : "新增"}
+          移除
         </button>
       </td>
     </tr>

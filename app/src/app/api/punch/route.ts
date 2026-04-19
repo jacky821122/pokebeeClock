@@ -27,8 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing or invalid kind" }, { status: 400 });
     }
 
-    const pinHash = crypto.createHash("sha256").update(pin).digest("hex");
-    const valid = await verifyPin(employee, pinHash);
+    const valid = await verifyPin(employee, pin);
     if (!valid) {
       return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
     }

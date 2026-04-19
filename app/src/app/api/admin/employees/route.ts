@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { listAllEmployees, addEmployee, updateEmployee } from "@/lib/sheets";
 
 function checkAuth(req: NextRequest): boolean {
@@ -7,10 +6,6 @@ function checkAuth(req: NextRequest): boolean {
   if (!expected) return false;
   const header = req.headers.get("authorization") ?? "";
   return header === `Bearer ${expected}`;
-}
-
-function hashPin(pin: string): string {
-  return crypto.createHash("sha256").update(pin).digest("hex");
 }
 
 function validPin(pin: unknown): pin is string {
@@ -43,9 +38,9 @@ export async function POST(req: NextRequest) {
 
     const existing = await listAllEmployees();
     if (existing.some((e) => e.name === name.trim())) {
-      return NextResponse.json({ error: "員工名稱已存在" }, { status: 409 });
+      return NextResponse.json({ error: `員工名稱已存在：${name}` }, { status: 409 });
     }
-    await addEmployee(name.trim(), hashPin(pin), role);
+    await addEmployee(name.trim(), pin, role);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -66,9 +61,9 @@ export async function PATCH(req: NextRequest) {
     if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 });
 
     const patch: Parameters<typeof updateEmployee>[1] = {};
-    if (pin !== undefined && pin !== "") {
+    if (pin !== undefined) {
       if (!validPin(pin)) return NextResponse.json({ error: "PIN 必須為 4 位數字" }, { status: 400 });
-      patch.pinHash = hashPin(pin);
+      patch.pin = pin;
     }
     if (role !== undefined) {
       if (!validRole(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });

@@ -8,7 +8,7 @@ const TAB_EMPLOYEES = "employees";
 const TAB_PUNCHES = "raw_punches";
 const TAB_AMENDMENTS = "amendments";
 
-// employees:   name | pin_hash | role | active
+// employees:   name | pin | role | active
 // raw_punches: id | employee | client_ts | server_ts | source | kind
 // amendments:  id | submitted_at | employee | date | shift | in_time | out_time | reason | status
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
@@ -62,7 +62,7 @@ export async function getEmployeeRole(name: string): Promise<"full_time" | "hour
   return (row?.[2] ?? "hourly") as "full_time" | "hourly";
 }
 
-export async function verifyPin(name: string, pinHash: string): Promise<boolean> {
+export async function verifyPin(name: string, pin: string): Promise<boolean> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
@@ -71,16 +71,16 @@ export async function verifyPin(name: string, pinHash: string): Promise<boolean>
   const rows = res.data.values ?? [];
   const row = rows.slice(1).find((r) => r[0] === name);
   if (!row) return false;
-  return row[1] === pinHash;
+  return row[1] === pin;
 }
 
 // ── employee admin ───────────────────────────────────────────────────────────
 
 export interface EmployeeAdmin {
   name: string;
+  pin: string;
   role: "full_time" | "hourly";
   active: boolean;
-  has_pin: boolean;
 }
 
 export async function listAllEmployees(): Promise<EmployeeAdmin[]> {
@@ -94,29 +94,29 @@ export async function listAllEmployees(): Promise<EmployeeAdmin[]> {
     .filter((r) => r[0])
     .map((r) => ({
       name: r[0] ?? "",
+      pin: r[1] ?? "",
       role: (r[2] ?? "hourly") as "full_time" | "hourly",
       active: r[3]?.toString().toUpperCase() === "TRUE",
-      has_pin: Boolean(r[1]),
     }));
 }
 
-export async function addEmployee(name: string, pinHash: string, role: "full_time" | "hourly"): Promise<void> {
+export async function addEmployee(name: string, pin: string, role: "full_time" | "hourly"): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
     range: `${TAB_EMPLOYEES}!A:D`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[name, pinHash, role, "TRUE"]] },
+    requestBody: { values: [[name, pin, role, "TRUE"]] },
   });
 }
 
 /**
  * Update one or more fields of an existing employee (located by name).
- * Pass `pinHash: null` to leave the PIN unchanged; any non-null string replaces it.
+ * Omit a field from `patch` to leave it unchanged.
  */
 export async function updateEmployee(
   name: string,
-  patch: { pinHash?: string | null; role?: "full_time" | "hourly"; active?: boolean },
+  patch: { pin?: string; role?: "full_time" | "hourly"; active?: boolean },
 ): Promise<void> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
@@ -126,10 +126,10 @@ export async function updateEmployee(
   const rows = res.data.values ?? [];
   const idx = rows.slice(1).findIndex((r) => r[0] === name);
   if (idx === -1) throw new Error(`Employee not found: ${name}`);
-  const rowNum = idx + 2; // header at row 1, so data rows start at 2
+  const rowNum = idx + 2;
   const current = rows[idx + 1];
 
-  const nextPinHash = patch.pinHash === undefined || patch.pinHash === null ? (current[1] ?? "") : patch.pinHash;
+  const nextPin = patch.pin ?? (current[1] ?? "");
   const nextRole = patch.role ?? (current[2] ?? "hourly");
   const nextActive = patch.active === undefined
     ? (current[3] ?? "TRUE")
@@ -139,7 +139,7 @@ export async function updateEmployee(
     spreadsheetId: sid(),
     range: `${TAB_EMPLOYEES}!A${rowNum}:D${rowNum}`,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[name, nextPinHash, nextRole, nextActive]] },
+    requestBody: { values: [[name, nextPin, nextRole, nextActive]] },
   });
 }
 
