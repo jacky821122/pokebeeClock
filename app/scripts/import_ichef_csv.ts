@@ -281,18 +281,120 @@ async function fetchFullTimeNames(): Promise<Set<string>> {
   return new Set(employees.filter((e) => e.role === "full_time").map((e) => e.name));
 }
 
+/**
+ * Format a Date (interpreted as Asia/Taipei local time) to
+ * `YYYY-MM-DDTHH:mm:ss.sss+08:00`, matching the live `/api/punch` format.
+ */
+function toTaipeiIso(d: Date): string {
+  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+    `.${pad(d.getMilliseconds(), 3)}+08:00`
+  );
+}
+
+/**
+ * Bulk write all three sheets in one go. Avoids per-employee API hammering that
+ * trips the Sheets read-quota. Total API calls: ~7 for the whole month.
+ */
 async function writeToSheets(
   yyyyMm: string,
   employeeResults: Array<{ summary: EmployeeSummary; records: PairRecord[] }>,
+  employeeEvents: Map<string, Event[]>,
 ): Promise<void> {
-  const { writeAnalyzedRecords, writeSummaryRow } = await import("../src/lib/sheets");
-  for (const { summary, records } of employeeResults) {
-    const empRecords = records.filter((r) => r.employee === summary.employee);
-    console.log(`Writing ${empRecords.length} records for ${summary.employee}...`);
-    await writeAnalyzedRecords(yyyyMm, summary.employee, empRecords);
-    await writeSummaryRow(yyyyMm, summary);
-    await new Promise((r) => setTimeout(r, 2000)); // avoid Sheets read quota
+  const { google } = await import("googleapis");
+  const crypto = await import("crypto");
+
+  const sa = process.env.GOOGLE_SA_JSON;
+  const sheetId = process.env.SHEET_ID;
+  if (!sa) throw new Error("GOOGLE_SA_JSON not set");
+  if (!sheetId) throw new Error("SHEET_ID not set");
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: JSON.parse(sa),
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+  const sheets = google.sheets({ version: "v4", auth });
+
+  // ── 1. Build raw_punches rows from events (timestamped events only) ────────
+  const punchRows: (string | number)[][] = [];
+  for (const [name, events] of employeeEvents) {
+    for (const ev of events) {
+      if (ev.kind === "no-clock-out") continue; // no timestamp
+      const iso = toTaipeiIso(ev.timestamp);
+      punchRows.push([crypto.randomUUID(), name, iso, iso, "ichef-import"]);
+    }
   }
+  punchRows.sort((a, b) => String(a[2]).localeCompare(String(b[2])));
+  console.log(`Appending ${punchRows.length} raw_punches...`);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: sheetId,
+    range: "raw_punches!A:E",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: punchRows },
+  });
+
+  // ── 2. Ensure analyzed/summary tabs exist (single metadata read) ──────────
+  const analyzedTab = `analyzed_${yyyyMm}`;
+  const summaryTab = `summary_${yyyyMm}`;
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+  const existingTabs = new Set(meta.data.sheets?.map((s) => s.properties?.title) ?? []);
+  const toCreate: string[] = [];
+  if (!existingTabs.has(analyzedTab)) toCreate.push(analyzedTab);
+  if (!existingTabs.has(summaryTab)) toCreate.push(summaryTab);
+  if (toCreate.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        requests: toCreate.map((title) => ({ addSheet: { properties: { title } } })),
+      },
+    });
+  }
+
+  // ── 3. Clear and bulk-write analyzed tab ──────────────────────────────────
+  console.log(`Clearing and writing ${analyzedTab}...`);
+  await sheets.spreadsheets.values.clear({ spreadsheetId: sheetId, range: `${analyzedTab}!A:Z` });
+  const analyzedRows: (string | number)[][] = [
+    ["employee", "date", "shift", "in_raw", "in_norm", "out_raw", "out_norm", "normal_hours", "overtime_hours", "note"],
+  ];
+  for (const { records } of employeeResults) {
+    for (const r of records) {
+      analyzedRows.push([
+        r.employee, r.date, r.shift, r.in_raw, r.in_norm, r.out_raw, r.out_norm,
+        r.normal_hours, r.overtime_hours, r.note,
+      ]);
+    }
+  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `${analyzedTab}!A1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: analyzedRows },
+  });
+
+  // ── 4. Clear and bulk-write summary tab ───────────────────────────────────
+  console.log(`Clearing and writing ${summaryTab}...`);
+  await sheets.spreadsheets.values.clear({ spreadsheetId: sheetId, range: `${summaryTab}!A:Z` });
+  const summaryRows: (string | number)[][] = [
+    ["employee", "is_full_time", "normal_hours", "overtime_hours", "specials", "overtime_specials"],
+  ];
+  for (const { summary } of employeeResults) {
+    summaryRows.push([
+      summary.employee,
+      summary.is_full_time ? "TRUE" : "FALSE",
+      summary.normal_hours,
+      summary.overtime_hours,
+      summary.specials.join(", "),
+      summary.overtime_specials.join(", "),
+    ]);
+  }
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `${summaryTab}!A1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: summaryRows },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +451,6 @@ async function main(): Promise<void> {
   console.log(`Found ${employeeEvents.size} employee(s) with events.\n`);
 
   // Analyze
-  const allRecords: PairRecord[] = [];
   const employeeResults: Array<{ summary: EmployeeSummary; records: PairRecord[] }> = [];
 
   for (const [name, events] of employeeEvents) {
@@ -359,7 +460,6 @@ async function main(): Promise<void> {
     if (summary.normal_hours === 0 && summary.overtime_hours === 0 && summary.specials.length === 0) {
       continue;
     }
-    allRecords.push(...records);
     employeeResults.push({ summary, records });
   }
 
@@ -377,7 +477,7 @@ async function main(): Promise<void> {
   // Write to sheets
   if (doWrite) {
     console.log("\nWriting to Google Sheets...");
-    await writeToSheets(monthKey, employeeResults);
+    await writeToSheets(monthKey, employeeResults, employeeEvents);
     console.log("Done.");
   }
 }
