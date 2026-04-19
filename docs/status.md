@@ -8,9 +8,7 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-1. **`/admin` 報表下載按鈕** — 呼叫 `generateReport(month)` 回傳 xlsx 當下載。
-    * 現在只能終端機跑，非工程人員沒辦法自己拿報表；lib 層已就緒，route 一層薄包裝即可。
-2. **PWA install-to-home 實機驗證（iPad Safari）** — 
+1. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
 3. **iCHEF CSV import 對照跑一次** — 用真實歷史資料跑 `scripts/import_ichef_csv.ts`，比對 Python 輸出。
     * analyzer 有 parity test 但沒跑過完整一個月的真實 CSV，實測才能確認邊界。
@@ -65,6 +63,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-19 — `/admin` 新增報表下載區塊：月份選擇器 + 下載 xlsx 按鈕，`GET /api/admin/report?month=YYYY-MM` 受 Bearer 保護
 - 2026-04-19 — PIN 改明文儲存（hash 對 4 位數無實質保護）；`/admin` 改為直接顯示/編輯 PIN、dirty 才能儲存、支援批次新增多列
 - 2026-04-19 — `/admin` 員工管理：列表/新增/重設 PIN/切 role/啟停用，API 受 `Bearer ADMIN_SECRET` 保護
 - 2026-04-19 — `raw_punches` 加 `kind` 欄、UI 拆上班/下班按鈕、`punchesToEvents` 自動補 `no-clock-out`；新增 `punches_to_events.test.ts` 補齊中間層測試

@@ -21,12 +21,14 @@ interface EmployeeResult {
   amendments: AmendmentRecord[];
 }
 
-export async function generateReport(yyyyMm: string): Promise<Buffer> {
+export async function generateReport(yyyyMm: string, log?: (label: string) => void): Promise<Buffer> {
+  log?.("start Sheets reads");
   const [employees, punchesByEmp, allAmendments] = await Promise.all([
     getActiveEmployees(),
     getAllPunchesForMonth(yyyyMm),
     getAmendmentsForMonth(yyyyMm),
   ]);
+  log?.("Sheets reads done");
 
   const fullTimeSet = new Set(employees.filter((e) => e.role === "full_time").map((e) => e.name));
 
@@ -67,7 +69,10 @@ export async function generateReport(yyyyMm: string): Promise<Buffer> {
 
   results.sort((a, b) => a.summary.employee.localeCompare(b.summary.employee));
 
-  return buildWorkbook(results);
+  log?.("analyze done, building workbook");
+  const buf = await buildWorkbook(results);
+  log?.("workbook done");
+  return buf;
 }
 
 async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {

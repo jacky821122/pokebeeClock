@@ -64,7 +64,7 @@ export default function AdminPage() {
   }
 
   return (
-    <EmployeesTable
+    <AdminDashboard
       secret={secret}
       onSignOut={() => {
         sessionStorage.removeItem(SECRET_KEY);
@@ -74,7 +74,78 @@ export default function AdminPage() {
   );
 }
 
-function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () => void }) {
+function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-4xl px-4 py-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold">管理後台</h1>
+        <button onClick={onSignOut} className="text-sm text-gray-500 hover:underline">
+          登出
+        </button>
+      </div>
+      <EmployeesTable secret={secret} />
+      <ReportDownload secret={secret} />
+    </div>
+  );
+}
+
+function ReportDownload({ secret }: { secret: string }) {
+  const today = new Date();
+  const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const [month, setMonth] = useState(defaultMonth);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/report?month=${month}`, {
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? `失敗（${res.status}）`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `clock_report_${month}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("網路錯誤");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-10">
+      <h2 className="mb-3 text-lg font-semibold">下載報表</h2>
+      <div className="flex items-center gap-3">
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="rounded border border-stone-300 px-3 py-2"
+        />
+        <button
+          onClick={download}
+          disabled={loading}
+          className="rounded bg-stone-800 px-4 py-2 text-white disabled:opacity-40"
+        >
+          {loading ? "產生中…" : "下載 xlsx"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+function EmployeesTable({ secret }: { secret: string }) {
   const [employees, setEmployees] = useState<EmployeeAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -160,13 +231,8 @@ function EmployeesTable({ secret, onSignOut }: { secret: string; onSignOut: () =
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">員工管理</h1>
-        <button onClick={onSignOut} className="text-sm text-gray-500 hover:underline">
-          登出
-        </button>
-      </div>
+    <div>
+      <h2 className="mb-3 text-lg font-semibold">員工管理</h2>
 
       {msg && (
         <div
