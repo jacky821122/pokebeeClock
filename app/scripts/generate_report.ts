@@ -59,7 +59,15 @@ async function main(): Promise<void> {
 
   const outDir = path.resolve(__dirname, "../data/reports");
   fs.mkdirSync(outDir, { recursive: true });
-  const outPath = path.join(outDir, `clock_report_${yyyyMm}.xlsx`);
+
+  let outPath = path.join(outDir, `clock_report_${yyyyMm}.xlsx`);
+  if (fs.existsSync(outPath)) {
+    let n = 1;
+    while (fs.existsSync(path.join(outDir, `clock_report_${yyyyMm}_${n}.xlsx`))) n++;
+    outPath = path.join(outDir, `clock_report_${yyyyMm}_${n}.xlsx`);
+    console.warn(`檔案已存在（可能被 Excel 開啟中），改寫入：${path.basename(outPath)}`);
+  }
+
   fs.writeFileSync(outPath, buf);
   console.log(`Wrote ${outPath} (${buf.length} bytes).`);
 }

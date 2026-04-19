@@ -9,8 +9,8 @@ const TAB_PUNCHES = "raw_punches";
 const TAB_AMENDMENTS = "amendments";
 
 // employees:   name | pin | role | active
-// raw_punches: id | employee | client_ts | server_ts | source | kind
-// amendments:  id | submitted_at | employee | date | shift | in_time | out_time | reason | status
+// raw_punches: employee | client_ts | server_ts | source | kind
+// amendments:  submitted_at | employee | date | shift | in_time | out_time | reason
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
@@ -149,10 +149,10 @@ export async function appendPunch(punch: Punch): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:F`,
+    range: `${TAB_PUNCHES}!A:E`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[punch.id, punch.employee, punch.client_ts, punch.server_ts, punch.source, punch.kind]],
+      values: [[punch.employee, punch.client_ts, punch.server_ts, punch.source, punch.kind]],
     },
   });
 }
@@ -170,13 +170,13 @@ export async function getPunchesForMonth(employee: string, yyyyMm: string): Prom
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:F`,
+    range: `${TAB_PUNCHES}!A:E`,
   });
   const rows = res.data.values ?? [];
   return rows
     .slice(1)
-    .filter((r) => r[1] === employee && (r[2] ?? "").startsWith(yyyyMm))
-    .map((r) => ({ ts: String(r[2]), kind: (r[5] ?? "") as PunchRow["kind"] }))
+    .filter((r) => r[0] === employee && (r[1] ?? "").startsWith(yyyyMm))
+    .map((r) => ({ ts: String(r[1]), kind: (r[4] ?? "") as PunchRow["kind"] }))
     .sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
@@ -188,16 +188,16 @@ export async function getAllPunchesForMonth(yyyyMm: string): Promise<Map<string,
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:F`,
+    range: `${TAB_PUNCHES}!A:E`,
   });
   const rows = res.data.values ?? [];
   const byEmployee = new Map<string, PunchRow[]>();
   for (const r of rows.slice(1)) {
-    const name = r[1];
-    const ts = r[2];
+    const name = r[0];
+    const ts = r[1];
     if (!name || !ts || !String(ts).startsWith(yyyyMm)) continue;
     if (!byEmployee.has(name)) byEmployee.set(name, []);
-    byEmployee.get(name)!.push({ ts: String(ts), kind: (r[5] ?? "") as PunchRow["kind"] });
+    byEmployee.get(name)!.push({ ts: String(ts), kind: (r[4] ?? "") as PunchRow["kind"] });
   }
   for (const arr of byEmployee.values()) arr.sort((a, b) => a.ts.localeCompare(b.ts));
   return byEmployee;
@@ -211,16 +211,16 @@ export async function getLastPunchKind(employee: string): Promise<"in" | "out" |
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:F`,
+    range: `${TAB_PUNCHES}!A:E`,
   });
   const rows = res.data.values ?? [];
   let latestTs = "";
   let latestKind: "in" | "out" | null = null;
   for (const r of rows.slice(1)) {
-    if (r[1] !== employee) continue;
-    const ts = String(r[2] ?? "");
+    if (r[0] !== employee) continue;
+    const ts = String(r[1] ?? "");
     if (ts <= latestTs) continue;
-    const kind = r[5];
+    const kind = r[4];
     if (kind !== "in" && kind !== "out") continue;
     latestTs = ts;
     latestKind = kind;
@@ -231,7 +231,6 @@ export async function getLastPunchKind(employee: string): Promise<"in" | "out" |
 // ── amendments ───────────────────────────────────────────────────────────────
 
 export interface AmendmentInput {
-  id: string;
   submitted_at: string;
   employee: string;
   date: string;
@@ -245,16 +244,15 @@ export async function appendAmendment(a: AmendmentInput): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
-    range: `${TAB_AMENDMENTS}!A:I`,
+    range: `${TAB_AMENDMENTS}!A:G`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[a.id, a.submitted_at, a.employee, a.date, a.shift, a.in_time, a.out_time, a.reason, "pending"]],
+      values: [[a.submitted_at, a.employee, a.date, a.shift, a.in_time, a.out_time, a.reason]],
     },
   });
 }
 
 export interface AmendmentRecord {
-  id: string;
   submitted_at: string;
   employee: string;
   date: string;
@@ -262,34 +260,26 @@ export interface AmendmentRecord {
   in_time: string;
   out_time: string;
   reason: string;
-  status: string;
 }
 
-/**
- * Read all amendments for a given month (filtered by `date` field prefix).
- * Returns all statuses — status is retained in data but currently not surfaced
- * in the report display layer.
- */
 export async function getAmendmentsForMonth(yyyyMm: string): Promise<AmendmentRecord[]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_AMENDMENTS}!A:I`,
+    range: `${TAB_AMENDMENTS}!A:G`,
   });
   const rows = res.data.values ?? [];
   return rows
     .slice(1)
-    .filter((r) => (r[3] ?? "").startsWith(yyyyMm))
+    .filter((r) => (r[2] ?? "").startsWith(yyyyMm))
     .map((r) => ({
-      id: r[0] ?? "",
-      submitted_at: r[1] ?? "",
-      employee: r[2] ?? "",
-      date: r[3] ?? "",
-      shift: r[4] ?? "",
-      in_time: r[5] ?? "",
-      out_time: r[6] ?? "",
-      reason: r[7] ?? "",
-      status: r[8] ?? "",
+      submitted_at: r[0] ?? "",
+      employee: r[1] ?? "",
+      date: r[2] ?? "",
+      shift: r[3] ?? "",
+      in_time: r[4] ?? "",
+      out_time: r[5] ?? "",
+      reason: r[6] ?? "",
     }));
 }
 

@@ -304,7 +304,6 @@ async function writeToSheets(
   employeeEvents: Map<string, Event[]>,
 ): Promise<void> {
   const { google } = await import("googleapis");
-  const crypto = await import("crypto");
 
   const sa = process.env.GOOGLE_SA_JSON;
   const sheetId = process.env.SHEET_ID;
@@ -328,14 +327,14 @@ async function writeToSheets(
       if (ev.kind === "no-clock-out") continue;
       const iso = toTaipeiIso(ev.timestamp);
       const kind = ev.kind === "clock-out" ? "out" : "in";
-      punchRows.push([crypto.randomUUID(), name, iso, iso, "ichef-import", kind]);
+      punchRows.push([name, iso, iso, "ichef-import", kind]);
     }
   }
   punchRows.sort((a, b) => String(a[2]).localeCompare(String(b[2])));
   console.log(`Appending ${punchRows.length} raw_punches...`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: "raw_punches!A:F",
+    range: "raw_punches!A:E",
     valueInputOption: "USER_ENTERED",
     requestBody: { values: punchRows },
   });

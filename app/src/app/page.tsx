@@ -108,6 +108,7 @@ export default function Home() {
       <div className="bg-stone-800 px-4 py-4 flex items-center gap-3">
         <span className="text-2xl">🐝</span>
         <h1 className="text-lg font-bold text-white">pokebee 打卡</h1>
+        <span className="ml-auto text-xs text-stone-500">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
       </div>
 
       <main className="mx-auto w-full max-w-lg px-4 py-6">

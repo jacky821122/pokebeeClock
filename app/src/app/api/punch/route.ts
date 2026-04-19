@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { verifyPin, appendPunch } from "@/lib/sheets";
 import { reanalyzeEmployee } from "@/lib/analyzer_bridge";
 import type { Punch, PunchKind } from "@/types";
@@ -33,7 +32,6 @@ export async function POST(req: NextRequest) {
     }
 
     const punch: Punch = {
-      id: crypto.randomUUID(),
       employee,
       client_ts: client_ts ?? nowTaipei(),
       server_ts: nowTaipei(),

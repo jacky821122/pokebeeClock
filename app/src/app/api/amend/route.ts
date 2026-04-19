@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { appendAmendment } from "@/lib/sheets";
 
 function nowTaipei(): string {
@@ -24,7 +23,6 @@ export async function POST(req: NextRequest) {
     }
 
     await appendAmendment({
-      id: crypto.randomUUID(),
       submitted_at: nowTaipei(),
       employee,
       date,
