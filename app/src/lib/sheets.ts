@@ -71,7 +71,7 @@ export async function verifyPin(name: string, pin: string): Promise<boolean> {
   const rows = res.data.values ?? [];
   const row = rows.slice(1).find((r) => r[0] === name);
   if (!row) return false;
-  return row[1] === pin;
+  return String(row[1] ?? "") === pin;
 }
 
 // ── employee admin ───────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export async function listAllEmployees(): Promise<EmployeeAdmin[]> {
     .filter((r) => r[0])
     .map((r) => ({
       name: r[0] ?? "",
-      pin: r[1] ?? "",
+      pin: String(r[1] ?? ""),
       role: (r[2] ?? "hourly") as "full_time" | "hourly",
       active: r[3]?.toString().toUpperCase() === "TRUE",
     }));
@@ -105,7 +105,7 @@ export async function addEmployee(name: string, pin: string, role: "full_time" |
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
     range: `${TAB_EMPLOYEES}!A:D`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: { values: [[name, pin, role, "TRUE"]] },
   });
 }
@@ -129,7 +129,7 @@ export async function updateEmployee(
   const rowNum = idx + 2;
   const current = rows[idx + 1];
 
-  const nextPin = patch.pin ?? (current[1] ?? "");
+  const nextPin = patch.pin ?? String(current[1] ?? "");
   const nextRole = patch.role ?? (current[2] ?? "hourly");
   const nextActive = patch.active === undefined
     ? (current[3] ?? "TRUE")
@@ -138,7 +138,7 @@ export async function updateEmployee(
   await sheets.spreadsheets.values.update({
     spreadsheetId: sid(),
     range: `${TAB_EMPLOYEES}!A${rowNum}:D${rowNum}`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     requestBody: { values: [[name, nextPin, nextRole, nextActive]] },
   });
 }
