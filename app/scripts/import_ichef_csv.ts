@@ -318,19 +318,24 @@ async function writeToSheets(
   const sheets = google.sheets({ version: "v4", auth });
 
   // ── 1. Build raw_punches rows from events (timestamped events only) ────────
+  // Map analyzer Event kinds back to the raw_punches `kind` column:
+  //   clock-in, clock-out-no-in → "in"
+  //   clock-out                 → "out"
+  //   no-clock-out              → skipped (no timestamp)
   const punchRows: (string | number)[][] = [];
   for (const [name, events] of employeeEvents) {
     for (const ev of events) {
-      if (ev.kind === "no-clock-out") continue; // no timestamp
+      if (ev.kind === "no-clock-out") continue;
       const iso = toTaipeiIso(ev.timestamp);
-      punchRows.push([crypto.randomUUID(), name, iso, iso, "ichef-import"]);
+      const kind = ev.kind === "clock-out" ? "out" : "in";
+      punchRows.push([crypto.randomUUID(), name, iso, iso, "ichef-import", kind]);
     }
   }
   punchRows.sort((a, b) => String(a[2]).localeCompare(String(b[2])));
   console.log(`Appending ${punchRows.length} raw_punches...`);
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId,
-    range: "raw_punches!A:E",
+    range: "raw_punches!A:F",
     valueInputOption: "USER_ENTERED",
     requestBody: { values: punchRows },
   });

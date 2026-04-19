@@ -9,9 +9,12 @@ const TAB_PUNCHES = "raw_punches";
 const TAB_AMENDMENTS = "amendments";
 
 // employees:   name | pin_hash | role | active
-// raw_punches: id | employee | client_ts | server_ts | source
+// raw_punches: id | employee | client_ts | server_ts | source | kind
 // amendments:  id | submitted_at | employee | date | shift | in_time | out_time | reason | status
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
+//
+// `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
+// handled by punchesToEvents via alternating fallback.
 
 function getAuth() {
   const sa = process.env.GOOGLE_SA_JSON;
@@ -77,49 +80,83 @@ export async function appendPunch(punch: Punch): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:E`,
+    range: `${TAB_PUNCHES}!A:F`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[punch.id, punch.employee, punch.client_ts, punch.server_ts, punch.source]],
+      values: [[punch.id, punch.employee, punch.client_ts, punch.server_ts, punch.source, punch.kind]],
     },
   });
 }
 
-export async function getPunchesForMonth(employee: string, yyyyMm: string): Promise<string[]> {
+/**
+ * A punch row, after the `kind` column was introduced. `kind` is "" for
+ * legacy rows written before 2026-04-19 — callers must handle that.
+ */
+export interface PunchRow {
+  ts: string;
+  kind: "in" | "out" | "";
+}
+
+export async function getPunchesForMonth(employee: string, yyyyMm: string): Promise<PunchRow[]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:E`,
+    range: `${TAB_PUNCHES}!A:F`,
   });
   const rows = res.data.values ?? [];
   return rows
     .slice(1)
     .filter((r) => r[1] === employee && (r[2] ?? "").startsWith(yyyyMm))
-    .map((r) => r[2] as string) // client_ts
-    .sort();
+    .map((r) => ({ ts: String(r[2]), kind: (r[5] ?? "") as PunchRow["kind"] }))
+    .sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
 /**
  * Read all punches for a month, grouped by employee (sorted by client_ts).
  * Used by the report generator to avoid N+1 reads.
  */
-export async function getAllPunchesForMonth(yyyyMm: string): Promise<Map<string, string[]>> {
+export async function getAllPunchesForMonth(yyyyMm: string): Promise<Map<string, PunchRow[]>> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:E`,
+    range: `${TAB_PUNCHES}!A:F`,
   });
   const rows = res.data.values ?? [];
-  const byEmployee = new Map<string, string[]>();
+  const byEmployee = new Map<string, PunchRow[]>();
   for (const r of rows.slice(1)) {
     const name = r[1];
     const ts = r[2];
     if (!name || !ts || !String(ts).startsWith(yyyyMm)) continue;
     if (!byEmployee.has(name)) byEmployee.set(name, []);
-    byEmployee.get(name)!.push(String(ts));
+    byEmployee.get(name)!.push({ ts: String(ts), kind: (r[5] ?? "") as PunchRow["kind"] });
   }
-  for (const arr of byEmployee.values()) arr.sort();
+  for (const arr of byEmployee.values()) arr.sort((a, b) => a.ts.localeCompare(b.ts));
   return byEmployee;
+}
+
+/**
+ * Last recorded punch for an employee, used by the UI to highlight the
+ * suggested direction (in/out). Returns null if no prior punch.
+ */
+export async function getLastPunchKind(employee: string): Promise<"in" | "out" | null> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sid(),
+    range: `${TAB_PUNCHES}!A:F`,
+  });
+  const rows = res.data.values ?? [];
+  let latestTs = "";
+  let latestKind: "in" | "out" | null = null;
+  for (const r of rows.slice(1)) {
+    if (r[1] !== employee) continue;
+    const ts = String(r[2] ?? "");
+    if (ts <= latestTs) continue;
+    const kind = r[5];
+    if (kind !== "in" && kind !== "out") continue;
+    latestTs = ts;
+    latestKind = kind;
+  }
+  return latestKind;
 }
 
 // ── amendments ───────────────────────────────────────────────────────────────

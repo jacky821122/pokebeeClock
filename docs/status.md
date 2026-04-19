@@ -8,21 +8,28 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-### 階段 2
-- **`/admin` 報表下載按鈕** — 呼叫 `generateReport(month)` 回傳 xlsx 當下載。為什麼：現在只能終端機跑，非工程人員沒辦法自己拿報表；lib 層已就緒，route 一層薄包裝即可。
-- **`/admin` 員工管理 CRUD** — 新增/停用員工、設定/重設 PIN。為什麼：目前 PIN 忘記只能手動改 sheet，有新員工也得直接編 sheet，不是長期解法。
-- **PWA install-to-home 實機驗證（iPad Safari）** — 為什麼：最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
-
-### 驗證 / 測試
-- **iCHEF CSV import 對照跑一次** — 用真實歷史資料跑 `scripts/import_ichef_csv.ts`，比對 Python 輸出。為什麼：analyzer 有 parity test 但沒跑過完整一個月的真實 CSV，實測才能確認邊界。
-- **展示層報表實機驗證** — 用 2026-03 或 2026-04 真實資料跑 `scripts/generate_report.ts`，比對 `pokebee/data/clock_in_out/clock_report_*.xlsx`。為什麼：這次新寫的，還沒跑過真資料。
-- **樣式調整** — 為什麼：現在是骨架樣式，等真實資料上去後一次統一處理比分散調整有效率。
-- **跨月邊界測試** — 第一筆跨月打卡自動建新 `analyzed_YYYY-MM` tab 的流程。為什麼：邏輯在 `ensureTab`，只在無資料時寫 header，沒實測過怕踩到 race。
-
-### 階段 3（可選 / 遠程）
-- **月底管理者 UI：approved amendments 合併進 raw_punches** — 為什麼：目前 amendments 不自動併入分析，月底要手動處理。
-- **iCHEF CSV 匯入常駐路徑** — 為什麼：若保留 iCHEF 平行流程作為備援，需要穩定匯入入口（目前 script 僅 one-off 驗證用）。
-- **LINE 通知** — 為什麼：打卡異常、月底結算等事件通知管理者。
+1. **legacy raw_punches 回填 `kind`** — 既有資料沒有 kind 欄位，目前靠 `punchesToEvents` 的交替 fallback。
+    * fallback 只在「整段都沒 kind」時正確，混入真實漏打情境會出錯；寫個一次性 script 依 timestamp 順序回填 in/out/in/out。
+2. **`/admin` 報表下載按鈕** — 呼叫 `generateReport(month)` 回傳 xlsx 當下載。
+    * 現在只能終端機跑，非工程人員沒辦法自己拿報表；lib 層已就緒，route 一層薄包裝即可。
+3. **`/admin` 員工管理 CRUD** — 新增/停用員工、設定/重設 PIN。
+    * 目前 PIN 忘記只能手動改 sheet，有新員工也得直接編 sheet，不是長期解法。
+4. **PWA install-to-home 實機驗證（iPad Safari）** — 
+    * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
+5. **iCHEF CSV import 對照跑一次** — 用真實歷史資料跑 `scripts/import_ichef_csv.ts`，比對 Python 輸出。
+    * analyzer 有 parity test 但沒跑過完整一個月的真實 CSV，實測才能確認邊界。
+6. **展示層報表實機驗證** — 用 2026-03 或 2026-04 真實資料跑 `scripts/generate_report.ts`，比對 `pokebee/data/clock_in_out/clock_report_*.xlsx`。
+    * 這次新寫的，還沒跑過真資料。
+7. **樣式調整** — 
+    * 現在是骨架樣式，等真實資料上去後一次統一處理比分散調整有效率。
+8. **跨月邊界測試** — 第一筆跨月打卡自動建新 `analyzed_YYYY-MM` tab 的流程。
+    * 邏輯在 `ensureTab`，只在無資料時寫 header，沒實測過怕踩到 race。
+9. **月底管理者 UI：approved amendments 合併進 raw_punches** — 
+    * 目前 amendments 不自動併入分析，月底要手動處理。
+10. **iCHEF CSV 匯入常駐路徑** — 
+    * 若保留 iCHEF 平行流程作為備援，需要穩定匯入入口（目前 script 僅 one-off 驗證用）。
+11. **LINE 通知** — 
+    * 打卡異常、月底結算等事件通知管理者。
 
 ---
 
@@ -62,6 +69,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-19 — `raw_punches` 加 `kind` 欄、UI 拆上班/下班按鈕、`punchesToEvents` 自動補 `no-clock-out`；新增 `punches_to_events.test.ts` 補齊中間層測試
 - 2026-04-19 — 新增 on-demand xlsx 展示層報表（摘要/明細/補班申請），廢除 `summary_*` tab (07d0cf2)
 
 ---

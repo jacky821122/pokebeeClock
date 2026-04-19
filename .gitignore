@@ -27,3 +27,6 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated reports (on-demand xlsx output)
+app/data/reports/

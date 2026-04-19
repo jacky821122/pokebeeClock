@@ -41,8 +41,8 @@ export async function generateReport(yyyyMm: string): Promise<Buffer> {
   // Analyze every employee with punches this month
   const results: EmployeeResult[] = [];
   const seenEmployees = new Set<string>();
-  for (const [name, timestamps] of punchesByEmp) {
-    const events = punchesToEvents(timestamps);
+  for (const [name, punches] of punchesByEmp) {
+    const events = punchesToEvents(punches);
     const { summary, records } = analyzeEmployee(name, events, fullTimeSet.has(name));
     if (summary.normal_hours === 0 && summary.overtime_hours === 0 && summary.specials.length === 0) {
       continue;

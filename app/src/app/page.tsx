@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import EmployeeGrid from "@/components/EmployeeGrid";
 import PinPad from "@/components/PinPad";
-import type { Employee } from "@/types";
+import type { Employee, PunchKind } from "@/types";
 
-type View = "grid" | "pin" | "success";
+type View = "grid" | "direction" | "pin" | "success";
 
 function nowTaipei(): string {
   const now = new Date();
@@ -18,10 +18,12 @@ export default function Home() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [kind, setKind] = useState<PunchKind | null>(null);
+  const [suggested, setSuggested] = useState<PunchKind | null>(null);
   const [view, setView] = useState<View>("grid");
   const [pinLoading, setPinLoading] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
-  const [lastPunch, setLastPunch] = useState<{ employee: string; server_ts: string } | null>(null);
+  const [lastPunch, setLastPunch] = useState<{ employee: string; kind: PunchKind; server_ts: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/employees")
@@ -31,32 +33,49 @@ export default function Home() {
       .finally(() => setLoadingEmployees(false));
   }, []);
 
-  function handleSelect(name: string) {
+  async function handleSelect(name: string) {
     setSelected(name);
     setPinError(null);
+    setSuggested(null);
+    setView("direction");
+    // Fetch last punch kind to suggest the opposite direction. Failure is non-fatal.
+    try {
+      const res = await fetch(`/api/punch/last?employee=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      const last: PunchKind | null = data?.kind ?? null;
+      setSuggested(last === "in" ? "out" : last === "out" ? "in" : "in");
+    } catch {
+      setSuggested("in");
+    }
+  }
+
+  function handleDirection(k: PunchKind) {
+    setKind(k);
     setView("pin");
   }
 
   async function handlePin(pin: string) {
-    if (!selected) return;
+    if (!selected || !kind) return;
     setPinLoading(true);
     setPinError(null);
     try {
       const res = await fetch("/api/punch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employee: selected, pin, client_ts: nowTaipei() }),
+        body: JSON.stringify({ employee: selected, pin, client_ts: nowTaipei(), kind }),
       });
       const data = await res.json();
       if (!res.ok) {
         setPinError(data.error ?? "打卡失敗");
         return;
       }
-      setLastPunch({ employee: selected, server_ts: data.server_ts });
+      setLastPunch({ employee: selected, kind, server_ts: data.server_ts });
       setView("success");
       setTimeout(() => {
         setView("grid");
         setSelected(null);
+        setKind(null);
+        setSuggested(null);
         setLastPunch(null);
       }, 2500);
     } catch {
@@ -69,17 +88,23 @@ export default function Home() {
   function handleCancel() {
     setView("grid");
     setSelected(null);
+    setKind(null);
+    setSuggested(null);
     setPinError(null);
   }
 
-  // Format server_ts for display: "HH:MM"
+  function handleBackToDirection() {
+    setKind(null);
+    setPinError(null);
+    setView("direction");
+  }
+
   function formatTime(iso: string) {
     return iso.slice(11, 16);
   }
 
   return (
     <div className="min-h-dvh bg-stone-50">
-      {/* Header */}
       <div className="bg-stone-800 px-4 py-4 flex items-center gap-3">
         <span className="text-2xl">🐝</span>
         <h1 className="text-lg font-bold text-white">pokebee 打卡</h1>
@@ -104,12 +129,39 @@ export default function Home() {
           </>
         )}
 
-        {view === "pin" && selected && (
+        {view === "direction" && selected && (
+          <div className="flex flex-col items-center gap-8 pt-10">
+            <p className="text-xl font-semibold text-gray-800">{selected}</p>
+            <p className="text-sm text-gray-500">選擇打卡類型</p>
+            <div className="flex w-full max-w-sm flex-col gap-4">
+              <DirectionButton
+                label="上班"
+                emoji="🟢"
+                suggested={suggested === "in"}
+                onClick={() => handleDirection("in")}
+              />
+              <DirectionButton
+                label="下班"
+                emoji="🔴"
+                suggested={suggested === "out"}
+                onClick={() => handleDirection("out")}
+              />
+            </div>
+            <button
+              onClick={handleCancel}
+              className="text-sm text-gray-400 underline-offset-2 hover:underline"
+            >
+              取消
+            </button>
+          </div>
+        )}
+
+        {view === "pin" && selected && kind && (
           <div className="flex items-center justify-center pt-8">
             <PinPad
-              employee={selected}
+              employee={`${selected}・${kind === "in" ? "上班" : "下班"}`}
               onConfirm={handlePin}
-              onCancel={handleCancel}
+              onCancel={handleBackToDirection}
               loading={pinLoading}
               error={pinError}
             />
@@ -121,11 +173,38 @@ export default function Home() {
             <div className="text-6xl">✅</div>
             <p className="text-2xl font-bold text-gray-800">{lastPunch.employee}</p>
             <p className="text-gray-500">
-              打卡成功・{formatTime(lastPunch.server_ts)}
+              {lastPunch.kind === "in" ? "上班" : "下班"}打卡成功・{formatTime(lastPunch.server_ts)}
             </p>
           </div>
         )}
       </main>
     </div>
+  );
+}
+
+function DirectionButton({
+  label,
+  emoji,
+  suggested,
+  onClick,
+}: {
+  label: string;
+  emoji: string;
+  suggested: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 ${
+        suggested
+          ? "bg-stone-800 text-white ring-4 ring-stone-300"
+          : "bg-white text-gray-700"
+      }`}
+    >
+      <span>{emoji}</span>
+      <span>{label}</span>
+      {suggested && <span className="text-xs font-normal opacity-70">（建議）</span>}
+    </button>
   );
 }

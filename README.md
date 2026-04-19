@@ -30,16 +30,21 @@ When the reviewer has questions, they drill down from the xlsx into the data lay
 | Tab | Columns |
 |---|---|
 | `employees` | `name`, `pin_hash`, `role` (full_time/hourly), `active` |
-| `raw_punches` | `id`, `employee`, `client_ts`, `server_ts`, `source` |
+| `raw_punches` | `id`, `employee`, `client_ts`, `server_ts`, `source`, `kind` (`in`/`out`) |
 | `amendments` | `id`, `submitted_at`, `employee`, `date`, `shift`, `in_time`, `out_time`, `reason`, `status` |
 | `analyzed_YYYY-MM` | `employee`, `date`, `shift`, `in_raw`, `in_norm`, `out_raw`, `out_norm`, `normal_hours`, `overtime_hours`, `note` |
 
 ### Punch flow
 
+UI: tap name → choose direction (上班 / 下班, one is highlighted based on the last recorded punch) → enter PIN → submit.
+
 ```
-/api/punch → verifyPin → appendPunch → reanalyzeEmployee
-                                         └→ getPunchesForMonth → analyzeEmployee → writeAnalyzedRecords
+/api/punch {employee, pin, kind, client_ts}
+  → verifyPin → appendPunch → reanalyzeEmployee
+                                └→ getPunchesForMonth → punchesToEvents → analyzeEmployee → writeAnalyzedRecords
 ```
+
+`punchesToEvents` turns the flat punch list into analyzer `Event`s, inserting synthetic `no-clock-out` events whenever two consecutive `in`s appear (the earlier one was forgotten) or the month ends on an `in`. Legacy rows without an explicit `kind` fall back to alternating order.
 
 ### Amendment flow
 

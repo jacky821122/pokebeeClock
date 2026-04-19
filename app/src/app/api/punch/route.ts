@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { verifyPin, appendPunch } from "@/lib/sheets";
 import { reanalyzeEmployee } from "@/lib/analyzer_bridge";
-import type { Punch } from "@/types";
+import type { Punch, PunchKind } from "@/types";
 
 function nowTaipei(): string {
   const now = new Date();
@@ -13,14 +13,18 @@ function nowTaipei(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { employee, pin, client_ts } = body as {
+    const { employee, pin, client_ts, kind } = body as {
       employee: string;
       pin: string;
       client_ts: string;
+      kind: PunchKind;
     };
 
     if (!employee || !pin) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+    if (kind !== "in" && kind !== "out") {
+      return NextResponse.json({ error: "Missing or invalid kind" }, { status: 400 });
     }
 
     const pinHash = crypto.createHash("sha256").update(pin).digest("hex");
@@ -35,6 +39,7 @@ export async function POST(req: NextRequest) {
       client_ts: client_ts ?? nowTaipei(),
       server_ts: nowTaipei(),
       source: "pwa",
+      kind,
     };
 
     await appendPunch(punch);
