@@ -155,7 +155,7 @@ function handleHourly(
   } else if (inNorm && outNorm) {
     shift = classifyShift(inNorm).shift;
     const worked = (outNorm.getTime() - inNorm.getTime()) / 3600 / 1000;
-    normal = worked;
+    normal = Math.max(worked, 0);
     if (Math.abs(normal - 4.0) > 1e-9) {
       notes.push(`${shift}，正常時數 ${fmtHours(normal)} 小時（非 4 小時）`);
     }
