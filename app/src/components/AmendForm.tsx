@@ -6,12 +6,9 @@ interface Props {
   employees: string[];
 }
 
-const SHIFTS = ["早班", "晚班1", "晚班2", "全日連續班"];
-
 export default function AmendForm({ employees }: Props) {
   const [employee, setEmployee] = useState("");
   const [date, setDate] = useState("");
-  const [shift, setShift] = useState(SHIFTS[0]);
   const [inTime, setInTime] = useState("");
   const [outTime, setOutTime] = useState("");
   const [reason, setReason] = useState("");
@@ -27,7 +24,7 @@ export default function AmendForm({ employees }: Props) {
       const res = await fetch("/api/amend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employee, date, shift, in_time: inTime, out_time: outTime, reason }),
+        body: JSON.stringify({ employee, date, in_time: inTime, out_time: outTime, reason }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -73,17 +70,6 @@ export default function AmendForm({ employees }: Props) {
           required
           className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
         />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">班別</label>
-        <select
-          value={shift}
-          onChange={(e) => setShift(e.target.value)}
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
-        >
-          {SHIFTS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

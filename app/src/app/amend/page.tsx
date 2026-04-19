@@ -1,12 +1,11 @@
 import Link from "next/link";
 import AmendForm from "@/components/AmendForm";
-import { getActiveEmployees } from "@/lib/sheets";
+import { getActiveEmployeesSortedByLastPunch } from "@/lib/sheets";
 
 export default async function AmendPage() {
   let employees: string[] = [];
   try {
-    const list = await getActiveEmployees();
-    employees = list.map((e) => e.name);
+    employees = await getActiveEmployeesSortedByLastPunch();
   } catch {
     // render with empty list; form will still show
   }

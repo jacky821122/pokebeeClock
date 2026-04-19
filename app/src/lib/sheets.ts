@@ -10,7 +10,7 @@ const TAB_AMENDMENTS = "amendments";
 
 // employees:   name | pin | role | active
 // raw_punches: employee | client_ts | server_ts | source | kind
-// amendments:  submitted_at | employee | date | shift | in_time | out_time | reason
+// amendments:  submitted_at | employee | date | in_time | out_time | reason
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
@@ -247,7 +247,6 @@ export interface AmendmentInput {
   submitted_at: string;
   employee: string;
   date: string;
-  shift: string;
   in_time: string;
   out_time: string;
   reason: string;
@@ -257,10 +256,10 @@ export async function appendAmendment(a: AmendmentInput): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
-    range: `${TAB_AMENDMENTS}!A:G`,
+    range: `${TAB_AMENDMENTS}!A:F`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[a.submitted_at, a.employee, a.date, a.shift, a.in_time, a.out_time, a.reason]],
+      values: [[a.submitted_at, a.employee, a.date, a.in_time, a.out_time, a.reason]],
     },
   });
 }
@@ -269,7 +268,6 @@ export interface AmendmentRecord {
   submitted_at: string;
   employee: string;
   date: string;
-  shift: string;
   in_time: string;
   out_time: string;
   reason: string;
@@ -279,7 +277,7 @@ export async function getAmendmentsForMonth(yyyyMm: string): Promise<AmendmentRe
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: sid(),
-    range: `${TAB_AMENDMENTS}!A:G`,
+    range: `${TAB_AMENDMENTS}!A:F`,
   });
   const rows = res.data.values ?? [];
   return rows
@@ -289,11 +287,40 @@ export async function getAmendmentsForMonth(yyyyMm: string): Promise<AmendmentRe
       submitted_at: r[0] ?? "",
       employee: r[1] ?? "",
       date: r[2] ?? "",
-      shift: r[3] ?? "",
-      in_time: r[4] ?? "",
-      out_time: r[5] ?? "",
-      reason: r[6] ?? "",
+      in_time: r[3] ?? "",
+      out_time: r[4] ?? "",
+      reason: r[5] ?? "",
     }));
+}
+
+export async function getActiveEmployeesSortedByLastPunch(): Promise<string[]> {
+  const sheets = getSheets();
+  const [empRes, punchRes] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId: sid(), range: `${TAB_EMPLOYEES}!A:D` }),
+    sheets.spreadsheets.values.get({ spreadsheetId: sid(), range: `${TAB_PUNCHES}!A:B` }),
+  ]);
+
+  const activeNames = (empRes.data.values ?? [])
+    .slice(1)
+    .filter((r) => r[3]?.toString().toUpperCase() === "TRUE")
+    .map((r) => String(r[0] ?? ""))
+    .filter(Boolean);
+
+  const lastPunchTs = new Map<string, string>();
+  for (const r of (punchRes.data.values ?? []).slice(1)) {
+    const name = String(r[0] ?? "");
+    const ts = String(r[1] ?? "");
+    if (name && ts && (!lastPunchTs.has(name) || ts > lastPunchTs.get(name)!)) {
+      lastPunchTs.set(name, ts);
+    }
+  }
+
+  return activeNames.sort((a, b) => {
+    const ta = lastPunchTs.get(a) ?? "";
+    const tb = lastPunchTs.get(b) ?? "";
+    if (ta === tb) return a.localeCompare(b, "zh-TW");
+    return ta > tb ? -1 : 1;
+  });
 }
 
 // ── analyzed / summary tabs ──────────────────────────────────────────────────

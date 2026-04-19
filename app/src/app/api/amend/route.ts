@@ -9,16 +9,15 @@ function nowTaipei(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { employee, date, shift, in_time, out_time, reason } = body as {
+    const { employee, date, in_time, out_time, reason } = body as {
       employee: string;
       date: string;
-      shift: string;
       in_time: string;
       out_time: string;
       reason: string;
     };
 
-    if (!employee || !date || !shift || !in_time || !out_time) {
+    if (!employee || !date || !in_time || !out_time) {
       return NextResponse.json({ error: "缺少必填欄位" }, { status: 400 });
     }
 
@@ -26,7 +25,6 @@ export async function POST(req: NextRequest) {
       submitted_at: nowTaipei(),
       employee,
       date,
-      shift,
       in_time,
       out_time,
       reason: reason ?? "",

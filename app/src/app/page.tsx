@@ -18,7 +18,6 @@ export default function Home() {
   const [pin, setPin] = useState<string>("");
   const [employee, setEmployee] = useState<string | null>(null);
   const [suggested, setSuggested] = useState<PunchKind>("in");
-  const [kind, setKind] = useState<PunchKind | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinKey, setPinKey] = useState(0);
@@ -51,45 +50,30 @@ export default function Home() {
     }
   }
 
-  async function handleDirection(k: PunchKind) {
+  function handleDirection(k: PunchKind) {
     if (!employee) return;
-    setKind(k);
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/punch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, client_ts: nowTaipei(), kind: k }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "打卡失敗");
-        return;
-      }
-      setLastPunch({ employee, kind: k, server_ts: data.server_ts });
-      setView("success");
-      setTimeout(() => {
-        setView("pin");
-        setPin("");
-        setEmployee(null);
-        setKind(null);
-        setError(null);
-        setLastPunch(null);
-        setPinKey((k2) => k2 + 1);
-      }, 2500);
-    } catch {
-      setError("網路錯誤，請再試一次");
-    } finally {
-      setLoading(false);
-    }
+    // Show success immediately; fire punch in background
+    setLastPunch({ employee, kind: k, server_ts: nowTaipei() });
+    setView("success");
+    setTimeout(() => {
+      setView("pin");
+      setPin("");
+      setEmployee(null);
+      setError(null);
+      setLastPunch(null);
+      setPinKey((k2) => k2 + 1);
+    }, 2000);
+    fetch("/api/punch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin, client_ts: nowTaipei(), kind: k }),
+    }).catch(() => {});
   }
 
   function handleCancel() {
     setView("pin");
     setPin("");
     setEmployee(null);
-    setKind(null);
     setError(null);
     setPinKey((k) => k + 1);
   }
@@ -130,27 +114,23 @@ export default function Home() {
           <div className="flex flex-col items-center gap-8 pt-10">
             <p className="text-2xl font-bold text-gray-800">{employee}</p>
             <p className="text-sm text-gray-500">選擇打卡類型</p>
-            {error && <p className="text-sm font-medium text-red-500">{error}</p>}
             <div className="flex w-full max-w-sm flex-col gap-4">
               <DirectionButton
                 label="上班"
                 emoji="🟢"
                 suggested={suggested === "in"}
-                loading={loading && kind === "in"}
                 onClick={() => handleDirection("in")}
               />
               <DirectionButton
                 label="下班"
                 emoji="🔴"
                 suggested={suggested === "out"}
-                loading={loading && kind === "out"}
                 onClick={() => handleDirection("out")}
               />
             </div>
             <button
               onClick={handleCancel}
-              disabled={loading}
-              className="text-sm text-gray-400 underline-offset-2 hover:underline disabled:opacity-50"
+              className="text-sm text-gray-400 underline-offset-2 hover:underline"
             >
               取消
             </button>
@@ -175,20 +155,17 @@ function DirectionButton({
   label,
   emoji,
   suggested,
-  loading,
   onClick,
 }: {
   label: string;
   emoji: string;
   suggested: boolean;
-  loading: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={loading}
-      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
+      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 ${
         suggested
           ? "bg-stone-800 text-white ring-4 ring-stone-300"
           : "bg-white text-gray-700"

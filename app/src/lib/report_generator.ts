@@ -102,7 +102,7 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
     if (amendments.length > 0) {
       for (const a of amendments) {
         const range = a.in_time && a.out_time ? `${a.in_time}-${a.out_time}` : (a.in_time || a.out_time || "");
-        wsSummary.addRow([`  ${a.date} ${a.shift} ${range} 原因：${a.reason}`]);
+        wsSummary.addRow([`  ${a.date} ${range} 原因：${a.reason}`]);
       }
     } else {
       wsSummary.addRow(["  無"]);
