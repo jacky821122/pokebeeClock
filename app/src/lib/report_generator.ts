@@ -1,0 +1,138 @@
+/**
+ * Display-layer report generator.
+ *
+ * Produces a human-readable xlsx matching the Python `write_xlsx_report`
+ * layout (pokebee/clock_in_out_analyzer.py). Two sheets:
+ *   - 摘要: per-employee block (正常時數 / 加班時數 / 特殊班別 / 補班申請)
+ *   - 明細: flat table of PairRecords
+ *
+ * Pure function — returns a Buffer. The caller decides where it goes
+ * (CLI writes to disk; a future admin route could stream it as a download).
+ */
+
+import ExcelJS from "exceljs";
+import { analyzeEmployee, fmtHours, type EmployeeSummary, type PairRecord } from "@/lib/analyzer";
+import { getActiveEmployees, getAllPunchesForMonth, getAmendmentsForMonth, type AmendmentRecord } from "@/lib/sheets";
+import { punchesToEvents } from "@/lib/analyzer_bridge";
+
+interface EmployeeResult {
+  summary: EmployeeSummary;
+  records: PairRecord[];
+  amendments: AmendmentRecord[];
+}
+
+export async function generateReport(yyyyMm: string): Promise<Buffer> {
+  const [employees, punchesByEmp, allAmendments] = await Promise.all([
+    getActiveEmployees(),
+    getAllPunchesForMonth(yyyyMm),
+    getAmendmentsForMonth(yyyyMm),
+  ]);
+
+  const fullTimeSet = new Set(employees.filter((e) => e.role === "full_time").map((e) => e.name));
+
+  // Amendments → by employee (sorted by date)
+  const amendByEmp = new Map<string, AmendmentRecord[]>();
+  for (const a of allAmendments) {
+    if (!amendByEmp.has(a.employee)) amendByEmp.set(a.employee, []);
+    amendByEmp.get(a.employee)!.push(a);
+  }
+  for (const arr of amendByEmp.values()) arr.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Analyze every employee with punches this month
+  const results: EmployeeResult[] = [];
+  const seenEmployees = new Set<string>();
+  for (const [name, timestamps] of punchesByEmp) {
+    const events = punchesToEvents(timestamps);
+    const { summary, records } = analyzeEmployee(name, events, fullTimeSet.has(name));
+    if (summary.normal_hours === 0 && summary.overtime_hours === 0 && summary.specials.length === 0) {
+      continue;
+    }
+    results.push({ summary, records, amendments: amendByEmp.get(name) ?? [] });
+    seenEmployees.add(name);
+  }
+
+  // Employees who submitted amendments but have no punches → still appear in report
+  for (const [name, amendments] of amendByEmp) {
+    if (seenEmployees.has(name)) continue;
+    const summary: EmployeeSummary = {
+      employee: name,
+      is_full_time: fullTimeSet.has(name),
+      normal_hours: 0,
+      overtime_hours: 0,
+      specials: [],
+      overtime_specials: [],
+    };
+    results.push({ summary, records: [], amendments });
+  }
+
+  results.sort((a, b) => a.summary.employee.localeCompare(b.summary.employee));
+
+  return buildWorkbook(results);
+}
+
+async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+
+  // ── 摘要 ────────────────────────────────────────────────────────────────
+  const wsSummary = wb.addWorksheet("摘要");
+  for (const { summary, amendments } of results) {
+    const role = summary.is_full_time ? "正職" : "計時";
+    wsSummary.addRow([`${summary.employee}（${role}）`]);
+    wsSummary.addRow([`正常時數 ${fmtHours(summary.normal_hours)} 小時`]);
+    wsSummary.addRow([`加班時數 ${fmtHours(summary.overtime_hours)} 小時`]);
+
+    wsSummary.addRow(["特殊班別:"]);
+    if (summary.specials.length > 0) {
+      for (const line of summary.specials) wsSummary.addRow([`  ${line}`]);
+    } else {
+      wsSummary.addRow(["  無"]);
+    }
+
+    if (summary.overtime_specials.length > 0) {
+      wsSummary.addRow(["加班:"]);
+      for (const line of summary.overtime_specials) wsSummary.addRow([`  ${line}`]);
+    }
+
+    wsSummary.addRow(["補班申請:"]);
+    if (amendments.length > 0) {
+      for (const a of amendments) {
+        const range = a.in_time && a.out_time ? `${a.in_time}-${a.out_time}` : (a.in_time || a.out_time || "");
+        wsSummary.addRow([`  ${a.date} ${a.shift} ${range} 原因：${a.reason}`]);
+      }
+    } else {
+      wsSummary.addRow(["  無"]);
+    }
+
+    wsSummary.addRow([]); // blank separator
+  }
+
+  // ── 明細 ────────────────────────────────────────────────────────────────
+  const wsDetail = wb.addWorksheet("明細");
+  wsDetail.addRow([
+    "員工", "班別", "日期", "上班原始", "上班normalized",
+    "下班原始", "下班normalized", "正常時數", "加班時數", "備註",
+  ]);
+  for (const { records } of results) {
+    for (const r of records) {
+      wsDetail.addRow([
+        r.employee, r.shift, r.date, r.in_raw, r.in_norm, r.out_raw, r.out_norm,
+        fmtHours(r.normal_hours), fmtHours(r.overtime_hours), r.note,
+      ]);
+    }
+  }
+
+  // Approximate auto-fit — same heuristic as the Python version.
+  for (const ws of [wsSummary, wsDetail]) {
+    ws.columns.forEach((col) => {
+      let maxLen = 0;
+      col.eachCell?.({ includeEmpty: false }, (cell) => {
+        const v = cell.value == null ? "" : String(cell.value);
+        if (v.length > maxLen) maxLen = v.length;
+      });
+      col.width = Math.min(maxLen + 4, 60);
+    });
+  }
+
+  const ab = await wb.xlsx.writeBuffer();
+  return Buffer.from(ab as ArrayBuffer);
+}

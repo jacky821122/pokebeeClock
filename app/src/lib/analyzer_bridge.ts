@@ -1,4 +1,4 @@
-import { getPunchesForMonth, getEmployeeRole, writeAnalyzedRecords, writeSummaryRow } from "@/lib/sheets";
+import { getPunchesForMonth, getEmployeeRole, writeAnalyzedRecords } from "@/lib/sheets";
 import { analyzeEmployee } from "@/lib/analyzer";
 import type { Event } from "@/lib/analyzer";
 
@@ -7,7 +7,7 @@ import type { Event } from "@/lib/analyzer";
  * Punches alternate: clock-in, clock-out, clock-in, clock-out, …
  * If the last punch has no pair, it becomes no-clock-out.
  */
-function punchesToEvents(timestamps: string[]): Event[] {
+export function punchesToEvents(timestamps: string[]): Event[] {
   const events: Event[] = [];
   for (let i = 0; i < timestamps.length; i++) {
     const ts = new Date(timestamps[i]);
@@ -36,8 +36,7 @@ export async function reanalyzeEmployee(employee: string, triggerTs: string): Pr
   const timestamps = await getPunchesForMonth(employee, yyyyMm);
   const events = punchesToEvents(timestamps);
 
-  const { summary, records } = analyzeEmployee(employee, events, isFullTime);
+  const { records } = analyzeEmployee(employee, events, isFullTime);
 
   await writeAnalyzedRecords(yyyyMm, employee, records);
-  await writeSummaryRow(yyyyMm, summary);
 }

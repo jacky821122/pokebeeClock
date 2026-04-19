@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import type { Employee, Punch } from "@/types";
-import type { PairRecord, EmployeeSummary } from "@/lib/analyzer";
+import type { PairRecord } from "@/lib/analyzer";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -12,7 +12,6 @@ const TAB_AMENDMENTS = "amendments";
 // raw_punches: id | employee | client_ts | server_ts | source
 // amendments:  id | submitted_at | employee | date | shift | in_time | out_time | reason | status
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
-// summary_YYYY-MM:  employee | is_full_time | normal_hours | overtime_hours | specials | overtime_specials
 
 function getAuth() {
   const sa = process.env.GOOGLE_SA_JSON;
@@ -100,6 +99,29 @@ export async function getPunchesForMonth(employee: string, yyyyMm: string): Prom
     .sort();
 }
 
+/**
+ * Read all punches for a month, grouped by employee (sorted by client_ts).
+ * Used by the report generator to avoid N+1 reads.
+ */
+export async function getAllPunchesForMonth(yyyyMm: string): Promise<Map<string, string[]>> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sid(),
+    range: `${TAB_PUNCHES}!A:E`,
+  });
+  const rows = res.data.values ?? [];
+  const byEmployee = new Map<string, string[]>();
+  for (const r of rows.slice(1)) {
+    const name = r[1];
+    const ts = r[2];
+    if (!name || !ts || !String(ts).startsWith(yyyyMm)) continue;
+    if (!byEmployee.has(name)) byEmployee.set(name, []);
+    byEmployee.get(name)!.push(String(ts));
+  }
+  for (const arr of byEmployee.values()) arr.sort();
+  return byEmployee;
+}
+
 // ── amendments ───────────────────────────────────────────────────────────────
 
 export interface AmendmentInput {
@@ -123,6 +145,46 @@ export async function appendAmendment(a: AmendmentInput): Promise<void> {
       values: [[a.id, a.submitted_at, a.employee, a.date, a.shift, a.in_time, a.out_time, a.reason, "pending"]],
     },
   });
+}
+
+export interface AmendmentRecord {
+  id: string;
+  submitted_at: string;
+  employee: string;
+  date: string;
+  shift: string;
+  in_time: string;
+  out_time: string;
+  reason: string;
+  status: string;
+}
+
+/**
+ * Read all amendments for a given month (filtered by `date` field prefix).
+ * Returns all statuses — status is retained in data but currently not surfaced
+ * in the report display layer.
+ */
+export async function getAmendmentsForMonth(yyyyMm: string): Promise<AmendmentRecord[]> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sid(),
+    range: `${TAB_AMENDMENTS}!A:I`,
+  });
+  const rows = res.data.values ?? [];
+  return rows
+    .slice(1)
+    .filter((r) => (r[3] ?? "").startsWith(yyyyMm))
+    .map((r) => ({
+      id: r[0] ?? "",
+      submitted_at: r[1] ?? "",
+      employee: r[2] ?? "",
+      date: r[3] ?? "",
+      shift: r[4] ?? "",
+      in_time: r[5] ?? "",
+      out_time: r[6] ?? "",
+      reason: r[7] ?? "",
+      status: r[8] ?? "",
+    }));
 }
 
 // ── analyzed / summary tabs ──────────────────────────────────────────────────
@@ -201,53 +263,3 @@ export async function writeAnalyzedRecords(yyyyMm: string, employee: string, rec
   });
 }
 
-export async function writeSummaryRow(yyyyMm: string, summary: EmployeeSummary): Promise<void> {
-  const sheets = getSheets();
-  const tab = `summary_${yyyyMm}`;
-  await ensureTab(sheets, tab);
-  const gid = await getTabGid(sheets, tab);
-
-  const res = await sheets.spreadsheets.values.get({ spreadsheetId: sid(), range: `${tab}!A:A` });
-  const allRows = res.data.values ?? [];
-
-  // Find existing row for this employee
-  const existingIdx = allRows.findIndex((r, i) => i > 0 && r[0] === summary.employee);
-
-  const row = [
-    summary.employee,
-    summary.is_full_time ? "TRUE" : "FALSE",
-    summary.normal_hours,
-    summary.overtime_hours,
-    summary.specials.join(", "),
-    summary.overtime_specials.join(", "),
-  ];
-
-  if (existingIdx > 0) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sid(),
-      range: `${tab}!A${existingIdx + 1}:F${existingIdx + 1}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [row] },
-    });
-  } else {
-    // Ensure header
-    if (allRows.length === 0) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sid(),
-        range: `${tab}!A1`,
-        valueInputOption: "USER_ENTERED",
-        requestBody: {
-          values: [["employee", "is_full_time", "normal_hours", "overtime_hours", "specials", "overtime_specials"]],
-        },
-      });
-    }
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: sid(),
-      range: `${tab}!A:F`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [row] },
-    });
-  }
-
-  void gid; // used only for potential future deletes
-}

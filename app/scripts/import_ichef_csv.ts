@@ -9,7 +9,7 @@
  *
  * - Reads an iCHEF clock-in/out CSV, parses events (same logic as the Python
  *   analyzer), calls analyzeEmployee() for each employee, and prints results.
- * - With --write: also writes to Google Sheets (analyzed_* / summary_* tabs).
+ * - With --write: also writes to Google Sheets (raw_punches + analyzed_* tab).
  *   Requires GOOGLE_SA_JSON and SHEET_ID env vars (loaded from .env.local).
  * - With --full-time=name1,name2: treat those employees as full-time instead
  *   of fetching from the Google Sheet.
@@ -335,14 +335,12 @@ async function writeToSheets(
     requestBody: { values: punchRows },
   });
 
-  // ── 2. Ensure analyzed/summary tabs exist (single metadata read) ──────────
+  // ── 2. Ensure analyzed tab exists (single metadata read) ──────────────────
   const analyzedTab = `analyzed_${yyyyMm}`;
-  const summaryTab = `summary_${yyyyMm}`;
   const meta = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
   const existingTabs = new Set(meta.data.sheets?.map((s) => s.properties?.title) ?? []);
   const toCreate: string[] = [];
   if (!existingTabs.has(analyzedTab)) toCreate.push(analyzedTab);
-  if (!existingTabs.has(summaryTab)) toCreate.push(summaryTab);
   if (toCreate.length > 0) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: sheetId,
@@ -371,29 +369,6 @@ async function writeToSheets(
     range: `${analyzedTab}!A1`,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: analyzedRows },
-  });
-
-  // ── 4. Clear and bulk-write summary tab ───────────────────────────────────
-  console.log(`Clearing and writing ${summaryTab}...`);
-  await sheets.spreadsheets.values.clear({ spreadsheetId: sheetId, range: `${summaryTab}!A:Z` });
-  const summaryRows: (string | number)[][] = [
-    ["employee", "is_full_time", "normal_hours", "overtime_hours", "specials", "overtime_specials"],
-  ];
-  for (const { summary } of employeeResults) {
-    summaryRows.push([
-      summary.employee,
-      summary.is_full_time ? "TRUE" : "FALSE",
-      summary.normal_hours,
-      summary.overtime_hours,
-      summary.specials.join(", "),
-      summary.overtime_specials.join(", "),
-    ]);
-  }
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: `${summaryTab}!A1`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: summaryRows },
   });
 }
 

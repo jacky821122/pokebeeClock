@@ -1,6 +1,6 @@
 # pokebeeClock — 當前狀態
 
-> 最後更新：2026-04-18
+> 最後更新：2026-04-19
 
 ## 完成度
 
@@ -24,20 +24,27 @@
 ### 打卡流程（MVP 階段 1）
 - [x] 員工格（`EmployeeGrid`）+ PIN 輸入（`PinPad`）
 - [x] `/api/employees`：讀 `employees` tab
-- [x] `/api/punch`：PIN 驗證 → 寫 `raw_punches` → 重算 `analyzed_*` / `summary_*`
+- [x] `/api/punch`：PIN 驗證 → 寫 `raw_punches` → 重算 `analyzed_*`
 - [x] `analyzer_bridge.ts`：punches → Events → analyzeEmployee → 寫回 sheet
 - [x] 補登頁 `/amend` + `/api/amend`（寫 `amendments`，status=pending）
 
+### 展示層（2026-04-19）
+- [x] 廢除 `summary_*` tab，改為 on-demand xlsx
+- [x] `src/lib/report_generator.ts`：純 function 產 xlsx Buffer（摘要 + 明細）
+- [x] `scripts/generate_report.ts <YYYY-MM>`：CLI 觸發，寫到 `data/reports/`
+- [x] 摘要區塊含「補班申請」，讀 `amendments` 不論 status
+- [x] 加 `exceljs` 相依
+
 ### 已驗證
 - [x] 打卡後 `raw_punches` 正確寫入
-- [x] `analyzed_2026-04` / `summary_2026-04` tab 自動建立並有資料
+- [x] `analyzed_2026-04` tab 自動建立並有資料
 
 ---
 
 ## 待完成
 
 ### 階段 2
-- [ ] `/admin` 月報檢視（讀 `summary_*` + `analyzed_*` 顯示）
+- [ ] `/admin` 報表下載按鈕（呼叫 `generateReport()` → stream xlsx；lib 層已就緒）
 - [ ] `/admin` 員工管理 CRUD（新增/停用員工、設定/重設 PIN）
 - [ ] PWA install-to-home 實機驗證（iPad Safari）
 
@@ -70,10 +77,17 @@ page.tsx → /api/punch → verifyPin() → appendPunch() → reanalyzeEmployee(
                                                           ↓
                                           getPunchesForMonth() → analyzeEmployee()
                                                           ↓
-                                      writeAnalyzedRecords() + writeSummaryRow()
+                                               writeAnalyzedRecords()
 
 補登流程：
 /amend → /api/amend → appendAmendment() [status=pending, 不觸發重算]
+
+展示層生成（月底 on-demand）：
+scripts/generate_report.ts <YYYY-MM>
+  → generateReport() [src/lib/report_generator.ts]
+  → getAllPunchesForMonth() + getActiveEmployees() + getAmendmentsForMonth()
+  → analyzeEmployee() per employee
+  → exceljs → data/reports/clock_report_<YYYY-MM>.xlsx
 ```
 
 ## 相關檔案
@@ -87,3 +101,5 @@ page.tsx → /api/punch → verifyPin() → appendPunch() → reanalyzeEmployee(
 | Sheets 操作 | `app/src/lib/sheets.ts` |
 | Analyzer bridge | `app/src/lib/analyzer_bridge.ts` |
 | Analyzer 本體 | `app/src/lib/analyzer/` |
+| 展示層生成 | `app/src/lib/report_generator.ts` |
+| CLI 觸發 | `app/scripts/generate_report.ts` |

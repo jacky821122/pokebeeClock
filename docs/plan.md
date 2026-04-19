@@ -51,8 +51,10 @@
 
 月底人工把 `status` 改成 `approved`。**補登不自動影響 analyzer 結果**，只是蒐集。
 
-### `analyzed_YYYY-MM` / `summary_YYYY-MM`
-欄位對齊 Python analyzer 的 XLSX 明細 headers 與 `format_summary()` 輸出（見 pokebee `clock_in_out_analyzer.py:402`）。
+### `analyzed_YYYY-MM`
+欄位對齊 Python analyzer 的 XLSX 明細 headers（見 pokebee `clock_in_out_analyzer.py`）。
+
+> `summary_*` tab 已廢除（2026-04-19）。月度摘要改為 on-demand 生成的 xlsx 展示層，從 `raw_punches` + `employees` + `amendments` 即時 aggregate。見 `src/lib/report_generator.ts` 與 `scripts/generate_report.ts`。
 
 ## 專案結構（仿 pokebeeExpense）
 
@@ -96,7 +98,8 @@ pokebeeClock/
 1. 從 `raw_punches` 讀該員工**該月**全部 events
 2. 呼叫 `analyzeEmployee(name, events)`（ported）→ 得到 records + summary
 3. 刪 `analyzed_YYYY-MM` 中該員工所有 row，寫回新結果
-4. 更新 `summary_YYYY-MM` 該員工那組
+
+Summary 只在展示層生成時現算，不持久化。
 
 低頻場景（一天幾十次打卡），Google Sheets API quota 完全撐得住。
 
