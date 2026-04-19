@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPin, appendPunch } from "@/lib/sheets";
+import { findEmployeeByPin, appendPunch } from "@/lib/sheets";
 import { reanalyzeEmployee } from "@/lib/analyzer_bridge";
 import type { Punch, PunchKind } from "@/types";
 
@@ -12,22 +12,21 @@ function nowTaipei(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { employee, pin, client_ts, kind } = body as {
-      employee: string;
+    const { pin, client_ts, kind } = body as {
       pin: string;
       client_ts: string;
       kind: PunchKind;
     };
 
-    if (!employee || !pin) {
+    if (!pin) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
     if (kind !== "in" && kind !== "out") {
       return NextResponse.json({ error: "Missing or invalid kind" }, { status: 400 });
     }
 
-    const valid = await verifyPin(employee, pin);
-    if (!valid) {
+    const employee = await findEmployeeByPin(pin);
+    if (!employee) {
       return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
     }
 
@@ -42,7 +41,7 @@ export async function POST(req: NextRequest) {
     await appendPunch(punch);
     await reanalyzeEmployee(employee, punch.server_ts);
 
-    return NextResponse.json({ ok: true, server_ts: punch.server_ts });
+    return NextResponse.json({ ok: true, employee, server_ts: punch.server_ts });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "打卡失敗" }, { status: 500 });

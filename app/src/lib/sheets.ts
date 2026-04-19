@@ -62,6 +62,19 @@ export async function getEmployeeRole(name: string): Promise<"full_time" | "hour
   return (row?.[2] ?? "hourly") as "full_time" | "hourly";
 }
 
+export async function findEmployeeByPin(pin: string): Promise<string | null> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sid(),
+    range: `${TAB_EMPLOYEES}!A:D`,
+  });
+  const rows = res.data.values ?? [];
+  const row = rows.slice(1).find(
+    (r) => String(r[1] ?? "") === pin && r[3]?.toString().toUpperCase() === "TRUE",
+  );
+  return row ? String(row[0]) : null;
+}
+
 export async function verifyPin(name: string, pin: string): Promise<boolean> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({

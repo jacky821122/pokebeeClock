@@ -3,6 +3,17 @@ import { analyzeEmployee } from "@/lib/analyzer";
 import type { Event } from "@/lib/analyzer";
 
 /**
+ * Parse a "+08:00" timestamp naively: extract Y/M/D/h/m/s from the string
+ * and build a Date as-if local time. On Vercel (UTC), .getHours() will then
+ * return the Taipei hour, matching the Python analyzer's naive-datetime logic.
+ */
+function parseTaipeiNaive(ts: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(ts);
+  if (!m) return new Date(ts);
+  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+}
+
+/**
  * Convert a sorted list of PunchRows to analyzer Events.
  *
  * New punches carry an explicit `kind` ("in" or "out"). Legacy rows
@@ -37,7 +48,7 @@ export function punchesToEvents(rows: PunchRow[]): Event[] {
     if (r.kind === "in" && lastKind === "in") {
       events.push({ kind: "no-clock-out" });
     }
-    events.push({ kind: r.kind === "in" ? "clock-in" : "clock-out", timestamp: new Date(r.ts) });
+    events.push({ kind: r.kind === "in" ? "clock-in" : "clock-out", timestamp: parseTaipeiNaive(r.ts) });
     lastKind = r.kind;
   }
   if (lastKind === "in") {

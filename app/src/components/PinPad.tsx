@@ -3,9 +3,9 @@
 import { useState } from "react";
 
 interface Props {
-  employee: string;
+  employee?: string;
   onConfirm: (pin: string) => void;
-  onCancel: () => void;
+  onCancel: (() => void) | null;
   loading: boolean;
   error: string | null;
 }
@@ -32,7 +32,9 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="text-center">
-        <p className="text-lg font-semibold text-gray-800">{employee}</p>
+        {employee ? (
+          <p className="text-lg font-semibold text-gray-800">{employee}</p>
+        ) : null}
         <p className="text-sm text-gray-500">請輸入 PIN</p>
       </div>
 
@@ -63,18 +65,20 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
                 : "bg-white shadow-sm active:scale-95 active:bg-stone-100 disabled:opacity-50"
             }`}
           >
-            {loading && key !== "⌫" ? (key === "⌫" ? "⌫" : key) : key}
+            {key}
           </button>
         ))}
       </div>
 
-      <button
-        onClick={onCancel}
-        disabled={loading}
-        className="text-sm text-gray-400 underline-offset-2 hover:underline"
-      >
-        取消
-      </button>
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          disabled={loading}
+          className="text-sm text-gray-400 underline-offset-2 hover:underline"
+        >
+          取消
+        </button>
+      )}
     </div>
   );
 }

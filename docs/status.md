@@ -40,7 +40,8 @@
 
 ```
 打卡流程：
-page.tsx → /api/punch → verifyPin() → appendPunch() → reanalyzeEmployee()
+page.tsx → /api/identify → findEmployeeByPin() → { employee, suggested_kind }
+         → /api/punch → findEmployeeByPin() → appendPunch() → reanalyzeEmployee()
                                                           ↓
                                           getPunchesForMonth() → analyzeEmployee()
                                                           ↓
@@ -63,6 +64,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-19 — 修 analyzed 時間錯 8 小時（`parseTaipeiNaive` 修正 +08:00 被當 UTC 解析）；打卡流程改 PIN-first（直接輸入 PIN 識別人員，省去選人步驟），新增 `/api/identify`
 - 2026-04-19 — `/admin` 新增報表下載區塊：月份選擇器 + 下載 xlsx 按鈕，`GET /api/admin/report?month=YYYY-MM` 受 Bearer 保護
 - 2026-04-19 — PIN 改明文儲存（hash 對 4 位數無實質保護）；`/admin` 改為直接顯示/編輯 PIN、dirty 才能儲存、支援批次新增多列
 - 2026-04-19 — `/admin` 員工管理：列表/新增/重設 PIN/切 role/啟停用，API 受 `Bearer ADMIN_SECRET` 保護
