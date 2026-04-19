@@ -22,6 +22,16 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 
 All timestamps are stored and displayed in **Asia/Taipei (UTC+8)**. Vercel runs in UTC — convert at the boundary before calling the analyzer.
 
+## Maintaining `docs/status.md`
+
+`docs/status.md` is the user's read/write worklog. Respect its shape:
+
+- **Requests live at the top** (what + why). When the user mentions a new idea or future work, append it to the Requests section with a one-line *why*. Default insertion is at the top of its subsection — the user reorders by priority themselves.
+- **Completed entries live at the bottom**, reverse chronological (newest first), one line each: `- YYYY-MM-DD — summary (commit hash)`.
+- **Noise filter**: only log completed entries that correspond to a Request, or that clearly add/remove a feature. Skip typo fixes, comment tweaks, and other trivial maintenance — those belong in the git log, not here.
+- When you finish work tied to a Request, move it: delete from Requests, add a completed line at the top of the completed list.
+- Do not reorganize existing completed entries. The earlier categorized block is frozen history.
+
 ## Reference repos (read-only)
 
 - `../pokebee/clock_in_out_analyzer.py` — Python ground truth for analyzer parity.
