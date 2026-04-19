@@ -8,7 +8,8 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-1. **PWA install-to-home 實機驗證（iPad Safari）** — 
+1. **打卡頁 device token 驗證** — 防止知道 URL 就能打卡。iPad 初次設定時輸入 setup code 存 localStorage，之後每次 punch API call 帶 token；失效只需改 env var，無 session 過期問題。
+2. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
 3. **iCHEF CSV import 對照跑一次** — 用真實歷史資料跑 `scripts/import_ichef_csv.ts`，比對 Python 輸出。
     * analyzer 有 parity test 但沒跑過完整一個月的真實 CSV，實測才能確認邊界。
