@@ -79,9 +79,12 @@ function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () =
     <div className="mx-auto w-full max-w-4xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">管理後台</h1>
-        <button onClick={onSignOut} className="text-sm text-gray-500 hover:underline">
-          登出
-        </button>
+        <div className="flex items-center gap-4">
+          <a href="/" className="text-sm text-stone-500 hover:underline">← 打卡系統</a>
+          <button onClick={onSignOut} className="text-sm text-gray-500 hover:underline">
+            登出
+          </button>
+        </div>
       </div>
       <ReportDownload secret={secret} />
       <EmployeesTable secret={secret} />
