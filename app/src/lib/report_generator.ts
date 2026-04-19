@@ -82,7 +82,8 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
   const wsSummary = wb.addWorksheet("摘要");
   for (const { summary, amendments } of results) {
     const role = summary.is_full_time ? "正職" : "計時";
-    wsSummary.addRow([`${summary.employee}（${role}）`]);
+    const nameRow = wsSummary.addRow([`${summary.employee}（${role}）`]);
+    nameRow.font = { bold: true };
     wsSummary.addRow([`正常時數 ${fmtHours(summary.normal_hours)} 小時`]);
     wsSummary.addRow([`加班時數 ${fmtHours(summary.overtime_hours)} 小時`]);
 
