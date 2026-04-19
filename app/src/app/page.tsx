@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PinPad from "@/components/PinPad";
 import type { PunchKind } from "@/types";
@@ -13,6 +14,16 @@ function nowTaipei(): string {
   return tw.toISOString().replace("Z", "+08:00");
 }
 
+// [temp] Returns "YYYY-MM-DDTHH:mm" in Taipei time for datetime-local input default.
+function nowTaipeiLocal(): string {
+  return nowTaipei().slice(0, 16);
+}
+
+// [temp] Converts datetime-local value to client_ts format.
+function toClientTs(local: string): string {
+  return local ? `${local}:00+08:00` : nowTaipei();
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState<string>("");
@@ -22,6 +33,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [pinKey, setPinKey] = useState(0);
   const [lastPunch, setLastPunch] = useState<{ employee: string; kind: PunchKind; server_ts: string } | null>(null);
+  const [customTs, setCustomTs] = useState(""); // [temp] override punch time for testing
+  const beeClicks = useRef(0);
+  const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
 
   async function handlePin(enteredPin: string) {
     setLoading(true);
@@ -41,6 +56,7 @@ export default function Home() {
       setPin(enteredPin);
       setEmployee(data.employee);
       setSuggested(data.suggested_kind ?? "in");
+      setCustomTs(nowTaipeiLocal()); // [temp] default to now when entering direction view
       setView("direction");
     } catch {
       setError("網路錯誤，請再試一次");
@@ -66,7 +82,7 @@ export default function Home() {
     fetch("/api/punch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin, client_ts: nowTaipei(), kind: k }),
+      body: JSON.stringify({ pin, client_ts: toClientTs(customTs), kind: k }), // [temp] uses customTs if set
     }).catch(() => {});
   }
 
@@ -82,10 +98,21 @@ export default function Home() {
     return iso.slice(11, 16);
   }
 
+  function handleBeeClick() {
+    beeClicks.current += 1;
+    if (beeTimer.current) clearTimeout(beeTimer.current);
+    if (beeClicks.current >= 5) {
+      beeClicks.current = 0;
+      router.push("/admin");
+    } else {
+      beeTimer.current = setTimeout(() => { beeClicks.current = 0; }, 3000);
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-stone-50">
       <div className="bg-stone-800 px-4 py-4 flex items-center gap-3">
-        <span className="text-2xl">🐝</span>
+        <button onClick={handleBeeClick} className="text-2xl select-none">🐝</button>
         <h1 className="text-lg font-bold text-white">pokebee 打卡</h1>
         <span className="ml-auto text-xs text-stone-500">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
       </div>
@@ -113,6 +140,16 @@ export default function Home() {
         {view === "direction" && employee && (
           <div className="flex flex-col items-center gap-8 pt-10">
             <p className="text-2xl font-bold text-gray-800">{employee}</p>
+            {/* [temp] custom punch time for testing */}
+            <div className="w-full max-w-sm">
+              <label className="mb-1 block text-xs text-gray-400">打卡時間（測試用）</label>
+              <input
+                type="datetime-local"
+                value={customTs}
+                onChange={(e) => setCustomTs(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+              />
+            </div>
             <p className="text-sm text-gray-500">選擇打卡類型</p>
             <div className="flex w-full max-w-sm flex-col gap-4">
               <DirectionButton

@@ -83,8 +83,8 @@ function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () =
           登出
         </button>
       </div>
-      <EmployeesTable secret={secret} />
       <ReportDownload secret={secret} />
+      <EmployeesTable secret={secret} />
     </div>
   );
 }
@@ -123,7 +123,7 @@ function ReportDownload({ secret }: { secret: string }) {
   }
 
   return (
-    <div className="mt-10">
+    <div>
       <h2 className="mb-3 text-lg font-semibold">下載報表</h2>
       <div className="flex items-center gap-3">
         <input
@@ -231,7 +231,7 @@ function EmployeesTable({ secret }: { secret: string }) {
   }
 
   return (
-    <div>
+    <div className="mt-10">
       <h2 className="mb-3 text-lg font-semibold">員工管理</h2>
 
       {msg && (

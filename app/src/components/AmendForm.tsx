@@ -68,29 +68,29 @@ export default function AmendForm({ employees }: Props) {
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+          className="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2 py-2.5 text-sm"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-sm font-medium text-gray-700">上班時間</label>
           <input
             type="time"
             value={inTime}
             onChange={(e) => setInTime(e.target.value)}
             required
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            className="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2 py-2.5 text-sm"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block text-sm font-medium text-gray-700">下班時間</label>
           <input
             type="time"
             value={outTime}
             onChange={(e) => setOutTime(e.target.value)}
             required
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+            className="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2 py-2.5 text-sm"
           />
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function AmendForm({ employees }: Props) {
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="例：忘記打卡"
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
+          className="w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2 py-2.5 text-sm"
         />
       </div>
 
