@@ -457,16 +457,17 @@ export interface OvertimeRequestInput {
   start_time: string;
   end_time: string;
   minutes: number;
+  reason?: string;
 }
 
 export async function appendOvertimeRequest(req: OvertimeRequestInput): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
-    range: `${TAB_OVERTIME}!A:F`,
+    range: `${TAB_OVERTIME}!A:G`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[req.submitted_at, req.employee, req.date, req.start_time, req.end_time, req.minutes]],
+      values: [[req.submitted_at, req.employee, req.date, req.start_time, req.end_time, req.minutes, req.reason ?? ""]],
     },
   });
 }
@@ -478,6 +479,7 @@ export interface OvertimeRecord {
   start_time: string;
   end_time: string;
   minutes: number;
+  reason: string;
 }
 
 export async function getOvertimeRequestsForMonth(yyyyMm: string): Promise<OvertimeRecord[]> {
@@ -485,7 +487,7 @@ export async function getOvertimeRequestsForMonth(yyyyMm: string): Promise<Overt
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sid(),
-      range: `${TAB_OVERTIME}!A:F`,
+      range: `${TAB_OVERTIME}!A:G`,
     });
     const rows = res.data.values ?? [];
     return rows
@@ -498,6 +500,7 @@ export async function getOvertimeRequestsForMonth(yyyyMm: string): Promise<Overt
         start_time: r[3] ?? "",
         end_time: r[4] ?? "",
         minutes: Number(r[5] ?? 0),
+        reason: r[6] ?? "",
       }));
   } catch {
     return [];

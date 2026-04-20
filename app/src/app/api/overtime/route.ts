@@ -24,11 +24,12 @@ function hmToMinutes(hm: string): number {
 
 export async function POST(req: NextRequest) {
   try {
-    const { pin, date, start_time, end_time } = (await req.json()) as {
+    const { pin, date, start_time, end_time, reason } = (await req.json()) as {
       pin: string;
       date: string;       // "YYYY-MM-DD"
       start_time: string;  // "HH:mm"
       end_time: string;    // "HH:mm"
+      reason?: string;
     };
 
     if (!pin || !date || !start_time || !end_time) {
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       start_time,
       end_time,
       minutes,
+      reason: reason?.trim() || "",
     });
 
     return NextResponse.json({ ok: true, employee, date, minutes });

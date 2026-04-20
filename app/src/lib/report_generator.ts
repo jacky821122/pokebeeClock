@@ -143,7 +143,8 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
     wsSummary.addRow(["加班申請:"]);
     if (overtimeRequests.length > 0) {
       for (const o of overtimeRequests) {
-        wsSummary.addRow([`  ${o.date} ${o.start_time}-${o.end_time}（${o.minutes}分鐘）`]);
+        const reasonPart = o.reason ? ` 原因：${o.reason}` : "";
+        wsSummary.addRow([`  ${o.date} ${o.start_time}-${o.end_time}（${o.minutes}分鐘）${reasonPart}`]);
       }
     } else {
       wsSummary.addRow(["  無"]);

@@ -87,6 +87,7 @@ function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () =
         </div>
       </div>
       <ReportDownload secret={secret} />
+      <ReanalyzeAll secret={secret} />
       <EmployeesTable secret={secret} />
     </div>
   );
@@ -144,6 +145,64 @@ function ReportDownload({ secret }: { secret: string }) {
         </button>
       </div>
       {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+function ReanalyzeAll({ secret }: { secret: string }) {
+  const today = new Date();
+  const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  const [month, setMonth] = useState(defaultMonth);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ text: string; ok: boolean } | null>(null);
+
+  async function run() {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/reanalyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+        body: JSON.stringify({ month }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ text: data.error ?? `失敗（${res.status}）`, ok: false });
+        return;
+      }
+      const msg = `完成：${data.count}/${data.total} 位員工重算成功` +
+        (data.errors?.length ? `\n失敗：${data.errors.join("、")}` : "");
+      setResult({ text: msg, ok: data.errors?.length === 0 });
+    } catch {
+      setResult({ text: "網路錯誤", ok: false });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="mt-8">
+      <h2 className="mb-3 text-lg font-semibold">全員工重算</h2>
+      <div className="flex items-center gap-3">
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="rounded border border-stone-300 px-3 py-2"
+        />
+        <button
+          onClick={run}
+          disabled={loading}
+          className="rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-40"
+        >
+          {loading ? "重算中…" : "重算全部員工"}
+        </button>
+      </div>
+      {result && (
+        <p className={`mt-2 whitespace-pre-wrap text-sm ${result.ok ? "text-green-700" : "text-red-500"}`}>
+          {result.text}
+        </p>
+      )}
     </div>
   );
 }

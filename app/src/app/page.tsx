@@ -61,6 +61,7 @@ export default function Home() {
   const [otDate, setOtDate] = useState("");
   const [otStart, setOtStart] = useState("18:00");
   const [otEnd, setOtEnd] = useState("19:00");
+  const [otReason, setOtReason] = useState("");
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,7 +121,7 @@ export default function Home() {
     setLoading(true);
     try {
       const res = await fetch("/api/overtime", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, date: otDate, start_time: otStart, end_time: otEnd }),
+        body: JSON.stringify({ pin, date: otDate, start_time: otStart, end_time: otEnd, reason: otReason.trim() || undefined }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "申請失敗"); return; }
@@ -260,6 +261,11 @@ export default function Home() {
               </Field>
               <Field label="結束時間">
                 <input type="time" value={otEnd} onChange={(e) => setOtEnd(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              <Field label="原因（選填）">
+                <input type="text" value={otReason} onChange={(e) => setOtReason(e.target.value)}
+                  placeholder="例：活動準備、盤點…"
                   className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
               </Field>
               {otStart && otEnd && (() => {
