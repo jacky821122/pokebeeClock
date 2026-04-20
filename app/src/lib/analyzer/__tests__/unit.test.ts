@@ -37,7 +37,8 @@ describe("floorToHalfHour", () => {
 });
 
 describe("normalizeInTime", () => {
-  it("09:11 → 09:30", () => expect(normalizeInTime(dt("09:11"))).toEqual(dt("09:30")));
+  // V2: unified roundToHalfHour for all times
+  it("09:11 → 09:00", () => expect(normalizeInTime(dt("09:11"))).toEqual(dt("09:00")));
   it("09:55 → 10:00", () => expect(normalizeInTime(dt("09:55"))).toEqual(dt("10:00")));
   it("10:00 → 10:00", () => expect(normalizeInTime(dt("10:00"))).toEqual(dt("10:00")));
   it("10:20 → 10:30", () => expect(normalizeInTime(dt("10:20"))).toEqual(dt("10:30")));
@@ -45,41 +46,26 @@ describe("normalizeInTime", () => {
 });
 
 describe("normalizeOutTime", () => {
-  it("19:47 / end=20:00 → 20:00", () =>
-    expect(normalizeOutTime(dt("19:47"), dt("20:00"))).toEqual(dt("20:00")));
-  it("20:17 / end=20:00 → grace → 20:00", () =>
-    expect(normalizeOutTime(dt("20:17"), dt("20:00"))).toEqual(dt("20:00")));
-  it("20:29 / end=20:00 → grace → 20:00", () =>
-    expect(normalizeOutTime(dt("20:29"), dt("20:00"))).toEqual(dt("20:00")));
-  it("20:49 / end=20:00 → floor → 20:30", () =>
-    expect(normalizeOutTime(dt("20:49"), dt("20:00"))).toEqual(dt("20:30")));
-  it("20:29 / end=20:30 → 20:30", () =>
-    expect(normalizeOutTime(dt("20:29"), dt("20:30"))).toEqual(dt("20:30")));
-  it("21:09 / end=20:00 → 21:00", () =>
-    expect(normalizeOutTime(dt("21:09"), dt("20:00"))).toEqual(dt("21:00")));
-  it("null end → standard round", () =>
-    expect(normalizeOutTime(dt("20:17"), null)).toEqual(dt("20:30")));
+  // V2: unified roundToHalfHour, no grace period
+  it("19:47 → 20:00", () =>
+    expect(normalizeOutTime(dt("19:47"))).toEqual(dt("20:00")));
+  it("20:17 → 20:30", () =>
+    expect(normalizeOutTime(dt("20:17"))).toEqual(dt("20:30")));
+  it("20:29 → 20:30", () =>
+    expect(normalizeOutTime(dt("20:29"))).toEqual(dt("20:30")));
+  it("20:49 → 21:00", () =>
+    expect(normalizeOutTime(dt("20:49"))).toEqual(dt("21:00")));
+  it("21:09 → 21:00", () =>
+    expect(normalizeOutTime(dt("21:09"))).toEqual(dt("21:00")));
 });
 
 describe("classifyShift", () => {
-  it("10:00 → 早班 end=14:00", () => {
-    const r = classifyShift(dt("10:00"));
-    expect(r.shift).toBe("早班");
-    expect(r.normalEnd.getHours()).toBe(14);
-    expect(r.normalEnd.getMinutes()).toBe(0);
-  });
-  it("14:00 → 晚班1 end=20:00", () => {
-    const r = classifyShift(dt("14:00"));
-    expect(r.shift).toBe("晚班1");
-    expect(r.normalEnd.getHours()).toBe(20);
-  });
-  it("16:00 → 晚班1", () => expect(classifyShift(dt("16:00")).shift).toBe("晚班1"));
-  it("16:30 → 晚班2 end=20:30", () => {
-    const r = classifyShift(dt("16:30"));
-    expect(r.shift).toBe("晚班2");
-    expect(r.normalEnd.getHours()).toBe(20);
-    expect(r.normalEnd.getMinutes()).toBe(30);
-  });
+  // V2: only 早班 / 晚班
+  it("10:00 → 早班", () => expect(classifyShift(dt("10:00"))).toBe("早班"));
+  it("13:30 → 早班", () => expect(classifyShift(dt("13:30"))).toBe("早班"));
+  it("14:00 → 晚班", () => expect(classifyShift(dt("14:00"))).toBe("晚班"));
+  it("16:00 → 晚班", () => expect(classifyShift(dt("16:00"))).toBe("晚班"));
+  it("16:30 → 晚班", () => expect(classifyShift(dt("16:30"))).toBe("晚班"));
 });
 
 describe("fmtHours", () => {

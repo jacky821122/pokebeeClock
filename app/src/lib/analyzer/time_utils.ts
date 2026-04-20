@@ -41,24 +41,20 @@ export function ceilingToHalfHour(dt: Date): Date {
   return out;
 }
 
-/** Python `normalize_in_time`. Before 10:00 → ceiling; otherwise → round. */
+/**
+ * Normalize in time: simply round to nearest half hour.
+ * (V2: unified rounding for both in and out.)
+ */
 export function normalizeInTime(inTs: Date): Date {
-  const tenAm = new Date(inTs.getTime());
-  tenAm.setHours(10, 0, 0, 0);
-  if (inTs.getTime() < tenAm.getTime()) return ceilingToHalfHour(inTs);
   return roundToHalfHour(inTs);
 }
 
-/** Python `normalize_out_time`. */
-export function normalizeOutTime(outTs: Date, normalEnd: Date | null): Date {
-  if (normalEnd === null || outTs.getTime() <= normalEnd.getTime()) {
-    return roundToHalfHour(outTs);
-  }
-  const graceEnd = new Date(normalEnd.getTime() + 30 * 60 * 1000);
-  if (outTs.getTime() < graceEnd.getTime()) {
-    return new Date(normalEnd.getTime());
-  }
-  return floorToHalfHour(outTs);
+/**
+ * Normalize out time: simply round to nearest half hour.
+ * (V2: no longer uses normalEnd / grace-period logic.)
+ */
+export function normalizeOutTime(outTs: Date): Date {
+  return roundToHalfHour(outTs);
 }
 
 /**

@@ -15,8 +15,12 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 
 ## Analyzer
 
+- **V2 rules** (2026-04-20): no automatic overtime, missing punch = 0hr + flag, full-time deducts 2hr break, per-shift cap 4hr (hourly), daily cap 8hr, flag at >8hr15min / >10hr15min (full-time). All overtime comes from overtime requests (not yet built).
 - **`isFullTime` must come from `employees.role`.** Never hardcode employee names anywhere in analyzer-related code paths.
+- **Shifts**: only 早班 / 晚班 (no sub-categories). Classification based on `normalizedIn < 14:00`.
+- **Normalize**: unified `roundToHalfHour` for both in and out. No grace period, no directional bias.
 - **Amendments do not auto-trigger recalculation.** They land in `amendments` with `status=pending`; the manager reviews at month-end. Do not wire them into the punch-triggered recalc.
+- **Python parity is no longer a goal.** V2 intentionally diverges from the Python analyzer. The parity test has been replaced with V2-specific tests.
 
 ## Time zone
 

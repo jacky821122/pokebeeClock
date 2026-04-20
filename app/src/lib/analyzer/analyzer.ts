@@ -1,25 +1,23 @@
 /**
- * Port of `clock_in_out_analyzer.py` calculation logic.
+ * V2 Analyzer — simplified calculation logic.
  *
- * API: `analyzeEmployee(name, events, isFullTime)` returns
- * `{ summary, records }`, byte-for-byte equivalent to the Python
- * `analyze_employee` + `apply_daily_overtime_for_pt` pipeline.
- *
- * Caller must supply `isFullTime` (sourced from the employees sheet in the
- * new system). The Python `FULL_TIME_NAMES` constant is intentionally NOT
- * reproduced here.
+ * Key changes from V1:
+ * - No automatic overtime calculation (all overtime comes from overtime requests)
+ * - Missing punches = 0hr + flag (no default hours)
+ * - Full-time: recorded_hours - 2hr (break deduction), cap 8hr
+ * - Hourly: actual hours, per-shift cap 4hr, daily cap 8hr
+ * - Unified normalize: roundToHalfHour for both in and out
+ * - Shift classification simplified: 早班 (< 14:00) / 晚班 (>= 14:00)
+ * - Flag when daily total > 8hr 15min (full-time: raw punch diff > 10hr 15min)
  */
 import type { Event } from "./events";
 import {
-  atTime,
   fmtDate,
-  fmtHhMm,
   fmtHours,
   fmtMinuteStamp,
   fmtTimestamp,
   normalizeInTime,
   normalizeOutTime,
-  roundToHalfHour,
   totalSeconds,
 } from "./time_utils";
 
@@ -45,13 +43,11 @@ export interface EmployeeSummary {
   overtime_specials: string[];
 }
 
-/** Python `classify_shift`. */
-export function classifyShift(normIn: Date): { shift: string; normalEnd: Date } {
+/** Classify shift based on normalized in time. */
+export function classifyShift(normIn: Date): string {
   const h = normIn.getHours() + normIn.getMinutes() / 60;
-  if (h < 14) return { shift: "早班", normalEnd: atTime(normIn, 14, 0) };
-  if (h <= 16 && h >= 14) return { shift: "晚班1", normalEnd: atTime(normIn, 20, 0) };
-  // h > 16
-  return { shift: "晚班2", normalEnd: atTime(normIn, 20, 30) };
+  if (h < 14) return "早班";
+  return "晚班";
 }
 
 function addRecord(
@@ -62,7 +58,6 @@ function addRecord(
 ): void {
   records.push(rec);
   summary.normal_hours += rec.normal_hours;
-  summary.overtime_hours += rec.overtime_hours;
   if (forceSpecial || rec.note) {
     summary.specials.push(`${rec.date} ${rec.note}`);
   }
@@ -79,20 +74,25 @@ function handleFullTime(
   const anchor = (inTs ?? outTs)!;
   const date = fmtDate(anchor);
   const inNorm = inTs ? normalizeInTime(inTs) : null;
-  const normalEnd = outTs ? atTime(outTs, 20, 0) : null;
-  const outNorm = outTs ? normalizeOutTime(outTs, normalEnd) : null;
+  const outNorm = outTs ? normalizeOutTime(outTs) : null;
 
-  let normal = inTs && outTs ? 8.0 : 0.0;
-  let overtime = 0.0;
+  let normal = 0.0;
   const notes: string[] = [];
 
   if (inferredNoIn || !inTs) {
     notes.push("缺上班打卡，需人工確認");
   } else if (!outTs) {
     notes.push("缺下班打卡，需人工確認");
-  } else if (outNorm!.getTime() >= normalEnd!.getTime() + 30 * 60 * 1000) {
-    overtime = (outNorm!.getTime() - normalEnd!.getTime()) / 3600 / 1000;
-    notes.push(`下班 ${fmtHhMm(outNorm!)}，計為 ${fmtHours(overtime)} 小時加班`);
+  } else {
+    // Full-time: punch diff - 2hr break, cap 8hr
+    const rawHours = (outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000;
+    const worked = Math.max(rawHours - 2, 0);
+    normal = Math.min(worked, 8.0);
+
+    // Flag if raw punch diff > 10hr 15min
+    if (rawHours > 10.25) {
+      notes.push(`上班時間 ${fmtHours(rawHours)} 小時（扣除空班後超過 8 小時 15 分），請確認是否需申請加班`);
+    }
   }
 
   addRecord(
@@ -107,7 +107,7 @@ function handleFullTime(
       out_raw: outTs ? fmtTimestamp(outTs) : "",
       out_norm: outNorm ? fmtMinuteStamp(outNorm) : "",
       normal_hours: normal,
-      overtime_hours: overtime,
+      overtime_hours: 0,
       note: notes.join("；"),
     },
     notes.length > 0,
@@ -125,56 +125,32 @@ function handleHourly(
   const anchor = (inTs ?? outTs)!;
   const date = fmtDate(anchor);
   const inNorm = inTs ? normalizeInTime(inTs) : null;
+  const outNorm = outTs ? normalizeOutTime(outTs) : null;
 
   let shift = "未知";
   let normal = 0.0;
-  let overtime = 0.0;
   const notes: string[] = [];
 
-  let outNorm: Date | null = null;
-  if (inNorm && outTs) {
-    const { normalEnd: normalEndPreview } = classifyShift(inNorm);
-    outNorm = normalizeOutTime(outTs, normalEndPreview);
-  } else if (outTs) {
-    outNorm = roundToHalfHour(outTs);
-  }
+  if (inferredNoIn || !inTs) {
+    // Missing clock-in: 0hr + flag
+    if (outNorm) {
+      const h = outNorm.getHours() + outNorm.getMinutes() / 60;
+      shift = h < 15 ? "早班" : h >= 20 ? "晚班" : "未知";
+    }
+    notes.push("缺上班打卡，需人工確認");
+  } else if (!outTs) {
+    // Missing clock-out: 0hr + flag
+    shift = classifyShift(inNorm!);
+    notes.push("缺下班打卡，需人工確認");
+  } else {
+    // Both present: actual hours, per-shift cap 4hr
+    shift = classifyShift(inNorm!);
+    const worked = Math.max((outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000, 0);
+    normal = Math.min(worked, 4.0);
 
-  if (
-    inNorm &&
-    outNorm &&
-    inNorm.getTime() < atTime(inNorm, 14, 0).getTime() &&
-    outNorm.getTime() >= atTime(outNorm, 20, 0).getTime()
-  ) {
-    shift = "全日連續班";
-    normal = 8.0;
-    const lateEnd = atTime(outNorm, 20, 30);
-    if (outNorm.getTime() > lateEnd.getTime()) {
-      overtime = (outNorm.getTime() - lateEnd.getTime()) / 3600 / 1000;
+    if (worked > 4.0) {
+      notes.push(`${shift}，實際 ${fmtHours(worked)} 小時，上限 4 小時`);
     }
-    notes.push("全日連續班（強制拆分）");
-  } else if (inNorm && outNorm) {
-    shift = classifyShift(inNorm).shift;
-    const worked = (outNorm.getTime() - inNorm.getTime()) / 3600 / 1000;
-    normal = Math.max(worked, 0);
-    if (Math.abs(normal - 4.0) > 1e-9) {
-      notes.push(`${shift}，正常時數 ${fmtHours(normal)} 小時（非 4 小時）`);
-    }
-  } else if (inNorm && !outNorm) {
-    shift = classifyShift(inNorm).shift;
-    normal = 4.0;
-    notes.push(`${shift}，無下班紀錄，計為 4 小時（default）`);
-  } else if (outNorm && !inNorm) {
-    const h = outNorm.getHours();
-    const m = outNorm.getMinutes();
-    if (h < 15 || (h === 14 && m <= 30)) {
-      shift = "早班";
-    } else if (h >= 20) {
-      shift = "晚班";
-    } else {
-      shift = "未知";
-    }
-    normal = 4.0;
-    notes.push(`${shift}，無上班紀錄，推算計為 4 小時`);
   }
 
   addRecord(
@@ -188,16 +164,20 @@ function handleHourly(
       in_norm: inNorm ? fmtMinuteStamp(inNorm) : "",
       out_raw: outTs ? fmtTimestamp(outTs) : "",
       out_norm: outNorm ? fmtMinuteStamp(outNorm) : "",
-      normal_hours: Math.max(normal, 0.0),
-      overtime_hours: Math.max(overtime, 0.0),
+      normal_hours: normal,
+      overtime_hours: 0,
       note: notes.join("；"),
     },
     notes.length > 0 || inferredNoIn,
   );
 }
 
-/** Python `apply_daily_overtime_for_pt`. Mutates records and summary in place. */
-export function applyDailyOvertimeForPt(
+/**
+ * Post-process: apply daily cap of 8hr for hourly employees.
+ * If daily total > 8hr 15min, add a flag.
+ * Cap normal_hours to 8hr per day.
+ */
+export function applyDailyCapForPt(
   records: PairRecord[],
   summary: EmployeeSummary,
 ): void {
@@ -210,34 +190,28 @@ export function applyDailyOvertimeForPt(
   }
 
   summary.normal_hours = 0.0;
-  summary.overtime_hours = 0.0;
 
   const sortedDates = Array.from(dayMap.keys()).sort();
   for (const date of sortedDates) {
     const dayRecs = dayMap.get(date)!;
-    const total = dayRecs.reduce(
-      (acc, r) => acc + r.normal_hours + r.overtime_hours,
-      0,
-    );
+    const total = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);
+
+    if (total > 8.25) {
+      // Flag: daily total exceeds 8hr 15min
+      summary.overtime_specials.push(
+        `${date} 日總時數 ${fmtHours(total)} 小時（超過 8 小時 15 分），請確認是否需申請加班`,
+      );
+    }
 
     if (total > 8.0) {
-      const overtime = total - 8.0;
+      // Cap to 8hr, distribute across records
       let remainingNormal = 8.0;
-      for (let i = 0; i < dayRecs.length - 1; i++) {
+      for (let i = 0; i < dayRecs.length; i++) {
         const r = dayRecs[i]!;
-        const rTotal = r.normal_hours + r.overtime_hours;
-        r.normal_hours = Math.min(rTotal, remainingNormal);
-        r.overtime_hours = 0.0;
-        remainingNormal = Math.max(0.0, remainingNormal - r.normal_hours);
+        r.normal_hours = Math.min(r.normal_hours, remainingNormal);
+        remainingNormal = Math.max(0, remainingNormal - r.normal_hours);
       }
-      const last = dayRecs[dayRecs.length - 1]!;
-      last.normal_hours = remainingNormal;
-      last.overtime_hours = overtime;
       summary.normal_hours += 8.0;
-      summary.overtime_hours += overtime;
-      summary.overtime_specials.push(
-        `${date} 日總時數 ${fmtHours(total)} 小時，計為 ${fmtHours(overtime)} 小時加班`,
-      );
     } else {
       summary.normal_hours += total;
     }
@@ -336,7 +310,7 @@ export function analyzeEmployee(
   }
 
   if (!isFullTime) {
-    applyDailyOvertimeForPt(records, summary);
+    applyDailyCapForPt(records, summary);
   }
 
   return { summary, records };

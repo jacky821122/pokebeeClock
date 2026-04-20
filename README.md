@@ -34,6 +34,17 @@ When the reviewer has questions, they drill down from the xlsx into the data lay
 | `amendments` | `id`, `submitted_at`, `employee`, `date`, `shift`, `in_time`, `out_time`, `reason`, `status` |
 | `analyzed_YYYY-MM` | `employee`, `date`, `shift`, `in_raw`, `in_norm`, `out_raw`, `out_norm`, `normal_hours`, `overtime_hours`, `note` |
 
+### Analyzer (V2)
+
+The analyzer calculates hours from punch records with these rules:
+
+- **Full-time**: `(norm_out - norm_in) - 2hr break`, cap 8hr. Flag if raw diff > 10hr 15min.
+- **Hourly**: `norm_out - norm_in`, per-shift cap 4hr, daily cap 8hr. Flag if daily total > 8hr 15min.
+- **Missing punch**: 0hr + flag (no default hours assumed).
+- **Overtime**: never auto-calculated. All overtime comes from overtime requests (planned).
+- **Shifts**: 早班 (`normalizedIn < 14:00`) / 晚班 (`>= 14:00`). No sub-categories.
+- **Normalize**: unified `roundToHalfHour` for both clock-in and clock-out.
+
 ### Punch flow
 
 UI: tap name → choose direction (上班 / 下班, one is highlighted based on the last recorded punch) → enter PIN → submit.

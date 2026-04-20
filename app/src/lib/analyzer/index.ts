@@ -1,7 +1,7 @@
 export type { Event } from "./events";
 export {
   analyzeEmployee,
-  applyDailyOvertimeForPt,
+  applyDailyCapForPt,
   classifyShift,
   type EmployeeSummary,
   type PairRecord,
