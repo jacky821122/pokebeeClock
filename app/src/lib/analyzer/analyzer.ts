@@ -172,10 +172,10 @@ function handleHourly(
       return;
     }
 
-    // Normal single-shift: actual hours, per-shift cap 4hr
+    // Normal single-shift: actual hours (cap applied later in applyDailyCapForPt)
     shift = classifyShift(inNorm!);
     const worked = Math.max((outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000, 0);
-    normal = Math.min(worked, 4.0);
+    normal = worked;
 
     if (worked > 4.0) {
       notes.push(`${shift}，實際 ${fmtHours(worked)} 小時，上限 4 小時`);
@@ -223,27 +223,26 @@ export function applyDailyCapForPt(
   const sortedDates = Array.from(dayMap.keys()).sort();
   for (const date of sortedDates) {
     const dayRecs = dayMap.get(date)!;
-    const total = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);
 
-    if (total > 8.25) {
-      // Flag: daily total exceeds 8hr 15min
+    // Sum actual worked hours (before any cap) for flag check
+    const actualTotal = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);
+
+    if (actualTotal > 8.25) {
       summary.overtime_specials.push(
-        `${date} 日總時數 ${fmtHours(total)} 小時（超過 8 小時 15 分），請確認是否需申請加班`,
+        `${date} 日實際總時數 ${fmtHours(actualTotal)} 小時（超過 8 小時 15 分），請確認是否需申請加班`,
       );
     }
 
-    if (total > 8.0) {
-      // Cap to 8hr, distribute across records
-      let remainingNormal = 8.0;
-      for (let i = 0; i < dayRecs.length; i++) {
-        const r = dayRecs[i]!;
-        r.normal_hours = Math.min(r.normal_hours, remainingNormal);
-        remainingNormal = Math.max(0, remainingNormal - r.normal_hours);
-      }
-      summary.normal_hours += 8.0;
-    } else {
-      summary.normal_hours += total;
+    // Apply per-shift cap (4hr) then daily cap (8hr)
+    let remainingNormal = 8.0;
+    for (const r of dayRecs) {
+      r.normal_hours = Math.min(r.normal_hours, 4.0); // per-shift cap
+      r.normal_hours = Math.min(r.normal_hours, remainingNormal); // daily cap
+      remainingNormal = Math.max(0, remainingNormal - r.normal_hours);
     }
+
+    const cappedTotal = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);
+    summary.normal_hours += cappedTotal;
   }
 }
 

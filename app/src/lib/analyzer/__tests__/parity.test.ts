@@ -158,18 +158,15 @@ describe("V2 analyzer — hourly", () => {
     expect(summary.overtime_hours).toBe(0);
   });
 
-  it("daily flag: two 4hr shifts when total would exceed 8hr15min before cap", () => {
-    // Hypothetical: 3.5hr + 4hr + 4hr via 3 shifts = won't happen with cap 4
-    // With cap 4 per shift, max day total = n*4. So flag at >8.25 means 3+ shifts.
+  it("daily flag: actual hours > 8hr15min triggers flag even after cap", () => {
+    // Two shifts: 10:00-14:30 (4.5hr) + 16:00-20:30 (4.5hr) = 9hr actual
     const { summary } = analyzeEmployee("B", [
-      ev("clock-in", "2026-02-01", "08:00"),
-      ev("clock-out", "2026-02-01", "12:00"),
-      ev("clock-in", "2026-02-01", "14:00"),
-      ev("clock-out", "2026-02-01", "18:00"),
-      ev("clock-in", "2026-02-01", "19:00"),
-      ev("clock-out", "2026-02-01", "23:00"),
+      ev("clock-in", "2026-02-01", "10:00"),
+      ev("clock-out", "2026-02-01", "14:20"),
+      ev("clock-in", "2026-02-01", "16:00"),
+      ev("clock-out", "2026-02-01", "20:50"),
     ], false);
-    // 3 shifts * 4hr cap = 12hr, daily cap to 8, flag at >8.25 → 12>8.25 flagged
+    // Each capped to 4hr → normal = 8, but actual 9hr > 8.25 → flagged
     expect(summary.normal_hours).toBe(8);
     expect(summary.overtime_specials.length).toBeGreaterThan(0);
     expect(summary.overtime_specials[0]).toContain("請確認是否需申請加班");
