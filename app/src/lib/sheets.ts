@@ -423,10 +423,13 @@ export async function getMissingPunches(employee: string, yyyyMm: string): Promi
     });
     const rows = res.data.values ?? [];
     const results: MissingPunch[] = [];
+    // Only flag missing punches for past dates — today's record is still in progress
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     for (const r of rows.slice(1)) {
       if (r[0] !== employee) continue;
       const note = String(r[9] ?? "");
       const date = String(r[1] ?? "");
+      if (date >= today) continue; // skip today and future
       const shift = String(r[2] ?? "");
       const inRaw = String(r[3] ?? "");
       const outRaw = String(r[5] ?? "");
