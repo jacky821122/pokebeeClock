@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import PinPad from "@/components/PinPad";
 import type { PunchKind } from "@/types";
@@ -12,6 +12,15 @@ interface MissingPunch {
   shift: string;
   missing: "in" | "out";
   existing_time: string;
+}
+
+interface OtRecord {
+  submitted_at: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  minutes: number;
+  reason: string;
 }
 
 /** Default supplement time based on shift + missing type */
@@ -62,6 +71,8 @@ export default function Home() {
   const [otStart, setOtStart] = useState("18:00");
   const [otEnd, setOtEnd] = useState("19:00");
   const [otReason, setOtReason] = useState("");
+  const [otRecords, setOtRecords] = useState<OtRecord[]>([]);
+  const [otLoading, setOtLoading] = useState(false);
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,6 +140,35 @@ export default function Home() {
     } catch { setError("網路錯誤"); } finally { setLoading(false); }
   }
 
+  async function loadOtRecords() {
+    if (!pin) return;
+    setOtLoading(true);
+    try {
+      const res = await fetch(`/api/overtime?pin=${encodeURIComponent(pin)}`);
+      const data = await res.json();
+      if (res.ok) setOtRecords(data.records ?? []);
+    } catch { /* ignore */ }
+    finally { setOtLoading(false); }
+  }
+
+  async function revokeOt(submittedAt: string) {
+    if (!pin) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/overtime", { method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin, submitted_at: submittedAt }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "撤回失敗"); return; }
+      setOtRecords((prev) => prev.filter((r) => r.submitted_at !== submittedAt));
+    } catch { setError("網路錯誤"); } finally { setLoading(false); }
+  }
+
+  function goToOvertime() {
+    setView("overtime");
+    loadOtRecords();
+  }
+
   function prefillFromMissing(mp: MissingPunch) {
     setSupDate(mp.date); setSupKind(mp.missing);
     setSupTime(defaultSupTime(mp.shift, mp.missing));
@@ -194,7 +234,7 @@ export default function Home() {
                 className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
                 📝 補登打卡
               </button>
-              <button onClick={() => setView("overtime")}
+              <button onClick={goToOvertime}
                 className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
                 🕐 加班申請
               </button>
@@ -282,6 +322,42 @@ export default function Home() {
                 {loading ? "送出中…" : "送出申請"}
               </button>
             </div>
+
+            {/* Recent overtime requests */}
+            <div className="w-full max-w-sm">
+              <p className="mb-2 text-sm font-semibold text-gray-600">最近申請紀錄</p>
+              {otLoading ? (
+                <p className="text-xs text-gray-400">載入中…</p>
+              ) : otRecords.length === 0 ? (
+                <p className="text-xs text-gray-400">無申請紀錄</p>
+              ) : (
+                <div className="space-y-2">
+                  {otRecords.map((r) => {
+                    const ageMs = Date.now() - new Date(r.submitted_at).getTime();
+                    const canRevoke = ageMs < 24 * 60 * 60 * 1000;
+                    return (
+                      <div key={r.submitted_at} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2">
+                        <div className="text-sm text-gray-700">
+                          <span className="font-medium">{r.date}</span>{" "}
+                          <span className="text-gray-500">{r.start_time}-{r.end_time}</span>{" "}
+                          <span className="text-xs text-gray-400">({r.minutes}分)</span>
+                          {r.reason && <span className="ml-1 text-xs text-gray-400">| {r.reason}</span>}
+                        </div>
+                        {canRevoke ? (
+                          <button onClick={() => revokeOt(r.submitted_at)} disabled={loading}
+                            className="ml-2 shrink-0 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-40">
+                            撤回
+                          </button>
+                        ) : (
+                          <span className="ml-2 text-xs text-gray-300">已逾時</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
           </div>
         )}

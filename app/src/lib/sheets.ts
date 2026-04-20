@@ -507,3 +507,61 @@ export async function getOvertimeRequestsForMonth(yyyyMm: string): Promise<Overt
   }
 }
 
+/**
+ * Get recent overtime requests for an employee, newest first.
+ */
+export async function getRecentOvertimeRequests(employee: string, limit = 10): Promise<OvertimeRecord[]> {
+  const sheets = getSheets();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${TAB_OVERTIME}!A:G`,
+    });
+    const rows = res.data.values ?? [];
+    const results: OvertimeRecord[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if ((r[1] ?? "") !== employee) continue;
+      if (!(r[0] ?? "")) continue; // skip cleared rows
+      results.push({
+        submitted_at: r[0] ?? "",
+        employee: r[1] ?? "",
+        date: r[2] ?? "",
+        start_time: r[3] ?? "",
+        end_time: r[4] ?? "",
+        minutes: Number(r[5] ?? 0),
+        reason: r[6] ?? "",
+      });
+    }
+    results.reverse();
+    return results.slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Delete an overtime request by clearing the row (matching submitted_at + employee).
+ */
+export async function deleteOvertimeRequest(submittedAt: string, employee: string): Promise<boolean> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sid(),
+    range: `${TAB_OVERTIME}!A:G`,
+  });
+  const rows = res.data.values ?? [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if ((r[0] ?? "") === submittedAt && (r[1] ?? "") === employee) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sid(),
+        range: `${TAB_OVERTIME}!A${i + 1}:G${i + 1}`,
+        valueInputOption: "RAW",
+        requestBody: { values: [["", "", "", "", "", "", ""]] },
+      });
+      return true;
+    }
+  }
+  return false;
+}
+

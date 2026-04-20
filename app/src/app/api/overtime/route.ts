@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findEmployeeByPin, appendOvertimeRequest } from "@/lib/sheets";
+import { findEmployeeByPin, appendOvertimeRequest, getRecentOvertimeRequests, deleteOvertimeRequest } from "@/lib/sheets";
 
 function nowTaipei(): string {
   const now = new Date();
@@ -64,5 +64,39 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "加班申請失敗" }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const pin = req.nextUrl.searchParams.get("pin") ?? "";
+    if (!pin) return NextResponse.json({ error: "Missing pin" }, { status: 400 });
+
+    const employee = await findEmployeeByPin(pin);
+    if (!employee) return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
+
+    const records = await getRecentOvertimeRequests(employee, 10);
+    return NextResponse.json({ records });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "讀取失敗" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { pin, submitted_at } = (await req.json()) as { pin: string; submitted_at: string };
+    if (!pin || !submitted_at) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+    const employee = await findEmployeeByPin(pin);
+    if (!employee) return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
+
+    const deleted = await deleteOvertimeRequest(submitted_at, employee);
+    if (!deleted) return NextResponse.json({ error: "找不到該筆申請" }, { status: 404 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "撤回失敗" }, { status: 500 });
   }
 }
