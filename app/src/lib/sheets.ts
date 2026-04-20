@@ -7,6 +7,7 @@ const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const TAB_EMPLOYEES = "employees";
 const TAB_PUNCHES = "raw_punches";
 const TAB_AMENDMENTS = "amendments";
+const TAB_OVERTIME = "overtime_requests";
 
 // employees:   name | pin | role | active
 // raw_punches: employee | client_ts | server_ts | source | kind
@@ -397,5 +398,101 @@ export async function writeAnalyzedRecords(yyyyMm: string, employee: string, rec
       ]),
     },
   });
+}
+
+// ── missing punch detection ──────────────────────────────────────────────────
+
+export interface MissingPunch {
+  date: string;
+  shift: string;
+  missing: "in" | "out";
+}
+
+/**
+ * Read the current month's analyzed_YYYY-MM tab for an employee and return
+ * records that have missing punch flags.
+ */
+export async function getMissingPunches(employee: string, yyyyMm: string): Promise<MissingPunch[]> {
+  const sheets = getSheets();
+  const tab = `analyzed_${yyyyMm}`;
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${tab}!A:J`,
+    });
+    const rows = res.data.values ?? [];
+    const results: MissingPunch[] = [];
+    for (const r of rows.slice(1)) {
+      if (r[0] !== employee) continue;
+      const note = String(r[9] ?? "");
+      const date = String(r[1] ?? "");
+      const shift = String(r[2] ?? "");
+      if (note.includes("缺下班打卡")) {
+        results.push({ date, shift, missing: "out" });
+      }
+      if (note.includes("缺上班打卡")) {
+        results.push({ date, shift, missing: "in" });
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+// ── overtime_requests ────────────────────────────────────────────────────────
+
+export interface OvertimeRequestInput {
+  submitted_at: string;
+  employee: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  minutes: number;
+}
+
+export async function appendOvertimeRequest(req: OvertimeRequestInput): Promise<void> {
+  const sheets = getSheets();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: sid(),
+    range: `${TAB_OVERTIME}!A:F`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[req.submitted_at, req.employee, req.date, req.start_time, req.end_time, req.minutes]],
+    },
+  });
+}
+
+export interface OvertimeRecord {
+  submitted_at: string;
+  employee: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  minutes: number;
+}
+
+export async function getOvertimeRequestsForMonth(yyyyMm: string): Promise<OvertimeRecord[]> {
+  const sheets = getSheets();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${TAB_OVERTIME}!A:F`,
+    });
+    const rows = res.data.values ?? [];
+    return rows
+      .slice(1)
+      .filter((r) => (r[2] ?? "").startsWith(yyyyMm))
+      .map((r) => ({
+        submitted_at: r[0] ?? "",
+        employee: r[1] ?? "",
+        date: r[2] ?? "",
+        start_time: r[3] ?? "",
+        end_time: r[4] ?? "",
+        minutes: Number(r[5] ?? 0),
+      }));
+  } catch {
+    return [];
+  }
 }
 

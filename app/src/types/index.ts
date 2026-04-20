@@ -10,6 +10,6 @@ export interface Punch {
   employee: string;
   client_ts: string; // ISO string, Asia/Taipei
   server_ts: string;
-  source: "pwa" | "ichef-import";
+  source: "pwa" | "ichef-import" | "supplement";
   kind: PunchKind;
 }

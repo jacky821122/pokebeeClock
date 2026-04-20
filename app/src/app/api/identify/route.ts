@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findEmployeeByPin, getLastPunchKind } from "@/lib/sheets";
+import { findEmployeeByPin, getLastPunchKind, getMissingPunches } from "@/lib/sheets";
 import type { PunchKind } from "@/types";
+
+function currentYyyyMm(): string {
+  const now = new Date();
+  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.toISOString().slice(0, 7);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,10 +16,13 @@ export async function POST(req: NextRequest) {
     const employee = await findEmployeeByPin(pin);
     if (!employee) return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
 
-    const lastKind = await getLastPunchKind(employee);
+    const [lastKind, missingPunches] = await Promise.all([
+      getLastPunchKind(employee),
+      getMissingPunches(employee, currentYyyyMm()),
+    ]);
     const suggested: PunchKind = lastKind === "in" ? "out" : "in";
 
-    return NextResponse.json({ employee, suggested_kind: suggested });
+    return NextResponse.json({ employee, suggested_kind: suggested, missing_punches: missingPunches });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "識別失敗" }, { status: 500 });

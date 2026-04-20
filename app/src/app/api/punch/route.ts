@@ -12,10 +12,11 @@ function nowTaipei(): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { pin, client_ts, kind } = body as {
+    const { pin, client_ts, kind, source } = body as {
       pin: string;
       client_ts: string;
       kind: PunchKind;
+      source?: "pwa" | "supplement";
     };
 
     if (!pin) {
@@ -30,16 +31,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
     }
 
+    const effectiveSource = source === "supplement" ? "supplement" : "pwa";
     const punch: Punch = {
       employee,
       client_ts: client_ts ?? nowTaipei(),
       server_ts: nowTaipei(),
-      source: "pwa",
+      source: effectiveSource,
       kind,
     };
 
     await appendPunch(punch);
-    await reanalyzeEmployee(employee, punch.server_ts);
+    // For supplement punches, reanalyze based on the client_ts month (the
+    // historical date being corrected), not the current server timestamp.
+    const triggerTs = effectiveSource === "supplement" ? punch.client_ts : punch.server_ts;
+    await reanalyzeEmployee(employee, triggerTs);
 
     return NextResponse.json({ ok: true, employee, server_ts: punch.server_ts });
   } catch (err) {
