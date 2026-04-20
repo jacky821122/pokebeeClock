@@ -122,6 +122,10 @@ export default function Home() {
   function handleSupplement() {
     if (!employee || !supDate || !supTime) return;
     const client_ts = `${supDate}T${supTime}:00+08:00`;
+    // Optimistic update: remove the matching missing punch from state
+    setMissingPunches((prev) => prev.filter(
+      (mp) => !(mp.date === supDate && mp.missing === supKind)
+    ));
     showSuccessAndReturn(`${employee}・${supDate} 補登${supKind === "in" ? "上班" : "下班"}成功`);
     fetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts, kind: supKind, source: "supplement" }),
