@@ -105,6 +105,12 @@ export default function Home() {
     setSuccessMsg(msg); setView("success"); setTimeout(resetToPin, delayMs);
   }
 
+  /** Brief success flash, then return to punch view (stay logged in) */
+  function showSuccessAndReturn(msg: string) {
+    setSuccessMsg(msg); setView("success");
+    setTimeout(() => { setView("punch"); setError(null); }, 1500);
+  }
+
   function handlePunch(k: PunchKind) {
     if (!employee) return;
     showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`);
@@ -113,31 +119,24 @@ export default function Home() {
     }).catch(() => {});
   }
 
-  async function handleSupplement() {
+  function handleSupplement() {
     if (!employee || !supDate || !supTime) return;
-    setLoading(true);
     const client_ts = `${supDate}T${supTime}:00+08:00`;
-    try {
-      const res = await fetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, client_ts, kind: supKind, source: "supplement" }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "補登失敗"); return; }
-      showSuccess(`${employee}・${supDate} 補登${supKind === "in" ? "上班" : "下班"}成功`);
-    } catch { setError("網路錯誤"); } finally { setLoading(false); }
+    showSuccessAndReturn(`${employee}・${supDate} 補登${supKind === "in" ? "上班" : "下班"}成功`);
+    fetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin, client_ts, kind: supKind, source: "supplement" }),
+    }).catch(() => {});
   }
 
-  async function handleOvertime() {
+  function handleOvertime() {
     if (!employee || !otDate || !otStart || !otEnd) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/overtime", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, date: otDate, start_time: otStart, end_time: otEnd, reason: otReason.trim() || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "申請失敗"); return; }
-      showSuccess(`${employee}・${otDate} 加班 ${data.minutes} 分鐘 申請成功`);
-    } catch { setError("網路錯誤"); } finally { setLoading(false); }
+    const diff = hmToMin(otEnd) - hmToMin(otStart);
+    const minutes = diff > 0 ? Math.floor(diff / 15) * 15 : 0;
+    if (minutes <= 0) { setError("加班時數不足 15 分鐘"); return; }
+    showSuccessAndReturn(`${employee}・${otDate} 加班 ${minutes} 分鐘 申請成功`);
+    fetch("/api/overtime", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin, date: otDate, start_time: otStart, end_time: otEnd, reason: otReason.trim() || undefined }),
+    }).catch(() => {});
   }
 
   async function loadOtRecords() {
@@ -313,7 +312,7 @@ export default function Home() {
                 const rounded = diff > 0 ? Math.floor(diff / 15) * 15 : 0;
                 return rounded > 0 ? (
                   <p className="text-center text-sm text-gray-500">
-                    加班時數：<span className="font-semibold text-gray-800">{rounded} 分鐘</span>（{(rounded / 60).toFixed(1)} 小時）
+                    加班時數：<span className="font-semibold text-gray-800">{rounded} 分鐘</span>（{(rounded / 60).toFixed(2)} 小時）
                   </p>
                 ) : null;
               })()}
