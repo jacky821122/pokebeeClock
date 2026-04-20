@@ -87,8 +87,8 @@ function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () =
         </div>
       </div>
       <ReportDownload secret={secret} />
-      <ReanalyzeAll secret={secret} />
       <EmployeesTable secret={secret} />
+      <ReanalyzeAll secret={secret} />
     </div>
   );
 }

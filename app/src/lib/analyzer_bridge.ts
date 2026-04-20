@@ -1,4 +1,4 @@
-import { getPunchesForMonth, getEmployeeRole, writeAnalyzedRecords, type PunchRow } from "@/lib/sheets";
+import { getPunchesForMonth, getEmployeeRole, writeAnalyzedRecords, getActiveEmployees, getAllPunchesForMonth, type PunchRow } from "@/lib/sheets";
 import { analyzeEmployee } from "@/lib/analyzer";
 import type { Event } from "@/lib/analyzer";
 
@@ -72,4 +72,37 @@ export async function reanalyzeEmployee(employee: string, triggerTs: string): Pr
   const { records } = analyzeEmployee(employee, events, isFullTime);
 
   await writeAnalyzedRecords(yyyyMm, employee, records);
+}
+
+/**
+ * Batch reanalyze all active employees for a given month.
+ * Only 2 Sheets API reads (employees + punches), then 1 write per employee with data.
+ */
+export async function reanalyzeAllEmployees(yyyyMm: string): Promise<{ count: number; total: number; errors: string[] }> {
+  const [employees, punchMap] = await Promise.all([
+    getActiveEmployees(),
+    getAllPunchesForMonth(yyyyMm),
+  ]);
+
+  let count = 0;
+  const errors: string[] = [];
+
+  for (const emp of employees) {
+    try {
+      const rows = punchMap.get(emp.name) ?? [];
+      if (rows.length === 0) {
+        count++;
+        continue;
+      }
+      const isFullTime = emp.role === "full_time";
+      const events = punchesToEvents(rows);
+      const { records } = analyzeEmployee(emp.name, events, isFullTime);
+      await writeAnalyzedRecords(yyyyMm, emp.name, records);
+      count++;
+    } catch (err) {
+      errors.push(`${emp.name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return { count, total: employees.length, errors };
 }
