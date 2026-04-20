@@ -8,10 +8,10 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-1. **加班申請系統** — 新增 `overtime_requests` Google Sheet tab + API + UI。輸入起迄時間，系統自動算時數（15 分鐘為單位），直接計入月結報表加班欄。
-2. **補打卡 UI** — 打卡頁面加入「補打 X 日上/下班」功能，寫入 `raw_punches`（`source=supplement`），觸發 reanalyze。需傳補打日期的 triggerTs（非今天）。
-3. **打卡頁缺打卡提示** — `/api/identify` 回傳時順帶查 `analyzed_YYYY-MM` 中有 flag 的日期，前端顯示「您 X 日缺下班打卡，是否補打？」。
-4. **報表整合加班申請** — `report_generator.ts` 讀取 `overtime_requests` 表，將申請時數加進摘要的加班欄。
+1. ~~**加班申請系統**~~ — ✅ 已完成（`/api/overtime` + UI + `overtime_requests` tab）
+2. ~~**補打卡 UI**~~ — ✅ 已完成（補登打卡 UI + `source=supplement` + triggerTs 用 client_ts）
+3. ~~**打卡頁缺打卡提示**~~ — ✅ 已完成（`/api/identify` 回傳 `missing_punches`，含已存在紀錄時間）
+4. ~~**報表整合加班申請**~~ — ✅ 已完成（`report_generator.ts` 讀取 `overtime_requests`，加計加班時數，摘要顯示明細）
 5. **打卡頁 device token 驗證** — 防止知道 URL 就能打卡。iPad 初次設定時輸入 setup code 存 localStorage，之後每次 punch API call 帶 token；失效只需改 env var，無 session 過期問題。
 6. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
@@ -31,7 +31,7 @@
 - **Vercel function timeout**：reanalyze 改成同步 await，打卡回應會比較慢（多幾秒）。資料量大時要觀察是否接近 10s limit。
 - **PIN reset 流程**：目前只能管理者直接改 sheet。
 - **跨月第一筆打卡**：`analyzed_YYYY-MM` tab 自動建立，但 header 只在無資料時寫入，需實測確認。
-- **V2 analyzer 尚未有加班申請整合**：analyzer 永遠回傳 `overtime_hours=0`，加班時數待 `overtime_requests` 表建好後在報表層加計。
+- **V2 analyzer 加班申請已整合至報表層**：analyzer 永遠回傳 `overtime_hours=0`，加班時數由 `report_generator.ts` 從 `overtime_requests` 表加計。
 - **舊版 parity test fixture 已過時**：`fixtures/` 目錄的 `.expected.json` 是 V1 output，parity test 已替換為 V2 專用測試。fixture 檔案保留供日後比對參考。
 
 ---
@@ -53,13 +53,13 @@ V2 analyzer 規則：
 - 計時全日班偵測：normIn < 14:00 且 normOut >= 15:00 → 早班缺out + 晚班缺in
 - 缺打卡：0hr + flag（不預設時數）
 - 超時flag：用實際時數（cap前）判定 > 8hr15min
-- 加班：系統不自動計算，全部來自加班申請（尚未建立）
+- **加班：系統不自動計算，全部來自加班申請**
 
-補打卡流程（計畫中）：
-打卡頁 → 選擇補打日期/時間 → /api/punch (source=supplement, triggerTs=補打日期)
+補打卡流程：
+打卡頁 → 選擇補打日期/時間 → /api/punch (source=supplement, triggerTs=client_ts月份)
 
-加班申請流程（計畫中）：
-UI → 輸入起迄時間 → 系統算時數(15min單位) → 寫入 overtime_requests → 月結報表直接加計
+加班申請流程：
+UI → 輸入起迄時間 → /api/overtime → 系統算時數(15min單位) → 寫入 overtime_requests → 月結報表直接加計
 
 補登流程（舊，保留）：
 /amend → /api/amend → appendAmendment() [status=pending, 不觸發重算]
@@ -67,8 +67,8 @@ UI → 輸入起迄時間 → 系統算時數(15min單位) → 寫入 overtime_r
 展示層生成（月底 on-demand）：
 scripts/generate_report.ts <YYYY-MM>
   → generateReport() [src/lib/report_generator.ts]
-  → getAllPunchesForMonth() + getActiveEmployees() + getAmendmentsForMonth()
-  → analyzeEmployee() per employee
+  → getAllPunchesForMonth() + getActiveEmployees() + getAmendmentsForMonth() + getOvertimeRequestsForMonth()
+  → analyzeEmployee() per employee + 加計 overtime_requests
   → exceljs → data/reports/clock_report_<YYYY-MM>.xlsx
 ```
 
@@ -78,6 +78,9 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-20 — 報表整合加班申請：`report_generator.ts` 讀取 `overtime_requests`，加計加班時數至摘要，顯示各筆加班明細
+- 2026-04-20 — UI 改版：PIN 後直接到打卡頁、缺卡顯示已存在紀錄與建議補登時間（依班別）、補登打卡 + 加班申請 UI
+- 2026-04-20 — 統一 PIN 流程 + 補登打卡 + 加班申請 API（`/api/punch` source=supplement、`/api/overtime`、`/api/identify` 回傳缺卡紀錄）
 - 2026-04-20 — V2 analyzer 改版：取消自動加班計算、缺打卡改 0hr+flag、正職扣 2hr 空班、計時每班 cap 4hr / 日 cap 8hr、班別簡化為早班/晚班、normalize 統一 roundToHalfHour、flag 閾值 >8hr15min（正職 >10hr15min）；parity test 替換為 V2 專用測試
 - 2026-04-19 — admin 後台加「← 打卡系統」返回連結；報表摘要員工名稱列改粗體 (c90d2e4)
 - 2026-04-19 — [temp] 打卡頁加指定打卡時間欄位（`datetime-local`，測試用）；bee emoji 連點 5 下進 `/admin`；補登頁 iPhone time input 溢出修正；admin 報表區塊移置頂 (2c83acc)

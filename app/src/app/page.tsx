@@ -291,19 +291,6 @@ export default function Home() {
   );
 }
 
-function MenuButton({ label, emoji, desc, onClick }: { label: string; emoji: string; desc: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick}
-      className="flex items-center gap-4 rounded-2xl bg-white px-5 py-5 shadow-sm transition-all active:scale-[0.98] hover:bg-stone-100">
-      <span className="text-2xl">{emoji}</span>
-      <div className="text-left">
-        <p className="text-lg font-bold text-gray-800">{label}</p>
-        <p className="text-xs text-gray-400">{desc}</p>
-      </div>
-    </button>
-  );
-}
-
 function DirectionButton({ label, emoji, suggested, onClick }: { label: string; emoji: string; suggested: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
