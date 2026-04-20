@@ -75,4 +75,5 @@ describe("fmtHours", () => {
   it("0 → 0", () => expect(fmtHours(0)).toBe("0"));
   it("1.0 → 1", () => expect(fmtHours(1.0)).toBe("1"));
   it("9.5 → 9.5", () => expect(fmtHours(9.5)).toBe("9.5"));
+  it("1.75 → 1.75", () => expect(fmtHours(1.75)).toBe("1.75"));
 });

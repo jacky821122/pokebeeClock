@@ -130,14 +130,12 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
       for (const line of summary.overtime_specials) wsSummary.addRow([`  ${line}`]);
     }
 
-    wsSummary.addRow(["補班申請:"]);
     if (amendments.length > 0) {
+      wsSummary.addRow(["補班申請:"]);
       for (const a of amendments) {
         const range = a.in_time && a.out_time ? `${a.in_time}-${a.out_time}` : (a.in_time || a.out_time || "");
         wsSummary.addRow([`  ${a.date} ${range} 原因：${a.reason}`]);
       }
-    } else {
-      wsSummary.addRow(["  無"]);
     }
 
     wsSummary.addRow(["加班申請:"]);

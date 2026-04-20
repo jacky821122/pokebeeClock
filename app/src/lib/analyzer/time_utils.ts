@@ -66,8 +66,8 @@ export function fmtHours(hours: number): string {
   if (Math.abs(hours - Math.round(hours)) < 1e-9) {
     return String(Math.round(hours));
   }
-  let s = hours.toFixed(1);
-  // strip trailing zeros then trailing dot (matches Python's .rstrip chain)
+  let s = hours.toFixed(2);
+  // strip trailing zeros then trailing dot (e.g. "4.50" → "4.5", "3.00" → "3")
   s = s.replace(/0+$/, "").replace(/\.$/, "");
   return s;
 }
