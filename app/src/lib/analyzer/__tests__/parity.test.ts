@@ -92,13 +92,41 @@ describe("V2 analyzer — hourly", () => {
     expect(records[0]!.note).toContain("上限 4 小時");
   });
 
-  it("per-shift cap: 10:00-20:00 (10hr) → cap 4hr + flag", () => {
+  it("full-day span 10:00-20:00 → 早班缺out + 晚班缺in, each 0hr + flag", () => {
     const { summary, records } = analyzeEmployee("B", [
       ev("clock-in", "2026-02-01", "10:00"),
       ev("clock-out", "2026-02-01", "20:00"),
     ], false);
+    expect(records).toHaveLength(2);
+    expect(records[0]!.shift).toBe("早班");
+    expect(records[0]!.normal_hours).toBe(0);
+    expect(records[0]!.note).toContain("早班缺下班打卡");
+    expect(records[1]!.shift).toBe("晚班");
+    expect(records[1]!.normal_hours).toBe(0);
+    expect(records[1]!.note).toContain("晚班缺上班打卡");
+    expect(summary.normal_hours).toBe(0);
+  });
+
+  it("10:00-18:00 also triggers missing punch detection (out >= 15:00)", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-02-01", "10:00"),
+      ev("clock-out", "2026-02-01", "18:00"),
+    ], false);
+    expect(records).toHaveLength(2);
+    expect(records[0]!.shift).toBe("早班");
+    expect(records[0]!.note).toContain("早班缺下班打卡");
+    expect(records[1]!.shift).toBe("晚班");
+    expect(records[1]!.note).toContain("晚班缺上班打卡");
+  });
+
+  it("10:00-14:30 stays as normal early shift cap 4hr (out < 15:00)", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-02-01", "10:00"),
+      ev("clock-out", "2026-02-01", "14:20"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.shift).toBe("早班");
     expect(records[0]!.normal_hours).toBe(4);
-    expect(records[0]!.note).toContain("上限 4 小時");
   });
 
   it("missing clock-out → 0hr + flag", () => {

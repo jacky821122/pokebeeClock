@@ -143,7 +143,36 @@ function handleHourly(
     shift = classifyShift(inNorm!);
     notes.push("缺下班打卡，需人工確認");
   } else {
-    // Both present: actual hours, per-shift cap 4hr
+    // Both present — check for full-day span (in < 14:00, out >= 20:00)
+    // This means the employee worked both shifts but forgot to clock out
+    // at end of early shift and clock in at start of late shift.
+    // → Two missing punch records: 早班缺out + 晚班缺in
+    const inH = inNorm!.getHours() + inNorm!.getMinutes() / 60;
+    const outH = outNorm!.getHours() + outNorm!.getMinutes() / 60;
+
+    if (inH < 14 && outH >= 15) {
+      // Early shift: has in, missing out → 0hr + flag
+      addRecord(records, summary, {
+        employee: name, date, shift: "早班",
+        in_raw: inTs ? fmtTimestamp(inTs) : "",
+        in_norm: inNorm ? fmtMinuteStamp(inNorm) : "",
+        out_raw: "", out_norm: "",
+        normal_hours: 0, overtime_hours: 0,
+        note: "早班缺下班打卡，需補打",
+      }, true);
+      // Late shift: missing in, has out → 0hr + flag
+      addRecord(records, summary, {
+        employee: name, date, shift: "晚班",
+        in_raw: "", in_norm: "",
+        out_raw: outTs ? fmtTimestamp(outTs) : "",
+        out_norm: outNorm ? fmtMinuteStamp(outNorm) : "",
+        normal_hours: 0, overtime_hours: 0,
+        note: "晚班缺上班打卡，需補打",
+      }, true);
+      return;
+    }
+
+    // Normal single-shift: actual hours, per-shift cap 4hr
     shift = classifyShift(inNorm!);
     const worked = Math.max((outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000, 0);
     normal = Math.min(worked, 4.0);
