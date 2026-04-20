@@ -39,10 +39,11 @@ When the reviewer has questions, they drill down from the xlsx into the data lay
 The analyzer calculates hours from punch records with these rules:
 
 - **Full-time**: `(norm_out - norm_in) - 2hr break`, cap 8hr. Flag if raw diff > 10hr 15min.
-- **Hourly**: `norm_out - norm_in`, per-shift cap 4hr, daily cap 8hr. Flag if daily total > 8hr 15min.
+- **Hourly**: `norm_out - norm_in`, per-shift cap 4hr, daily cap 8hr. Flag uses **actual hours** (before cap) > 8hr 15min.
+- **Full-day detection** (hourly): if `normIn < 14:00` and `normOut >= 15:00`, treated as two missing punches (早班缺out + 晚班缺in).
 - **Missing punch**: 0hr + flag (no default hours assumed).
 - **Overtime**: never auto-calculated. All overtime comes from overtime requests (planned).
-- **Shifts**: 早班 (`normalizedIn < 14:00`) / 晚班 (`>= 14:00`). No sub-categories.
+- **Shifts**: 早班 (`normalizedIn < 14:00`) / 晚班 (`>= 14:00`). Windows with ±1hr buffer: 9–15 / 15–21.
 - **Normalize**: unified `roundToHalfHour` for both clock-in and clock-out.
 
 ### Punch flow

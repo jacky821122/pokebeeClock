@@ -4,7 +4,7 @@
 
 ---
 
-## Requests（待辦 / 想法池）
+## Requests（待辦- 2026-04-20 — V2 analyzer 改版：取消自動加班、缺打卡改 0hr+flag、正職扣 2hr 空班、計時每班 cap 4hr / 日 cap 8hr、班別簡化為早班/晚班、normalize 統一 roundToHalfHour；全日班偵測（normOut>=15:00）拆為缺兩筆打卡；超時 flag 改用實際時數判定 (116b210)/ 想法池）
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
@@ -49,8 +49,10 @@ page.tsx → /api/identify → findEmployeeByPin() → { employee, suggested_kin
 
 V2 analyzer 規則：
 - 正職：(norm_out - norm_in - 2hr break), cap 8hr, flag if raw > 10hr15min
-- 計時：(norm_out - norm_in), per-shift cap 4hr, daily cap 8hr, flag if daily > 8hr15min
+- 計時：(norm_out - norm_in), per-shift cap 4hr, daily cap 8hr
+- 計時全日班偵測：normIn < 14:00 且 normOut >= 15:00 → 早班缺out + 晚班缺in
 - 缺打卡：0hr + flag（不預設時數）
+- 超時flag：用實際時數（cap前）判定 > 8hr15min
 - 加班：系統不自動計算，全部來自加班申請（尚未建立）
 
 補打卡流程（計畫中）：
