@@ -5,12 +5,19 @@ import { useRouter } from "next/navigation";
 import PinPad from "@/components/PinPad";
 import type { PunchKind } from "@/types";
 
-type View = "pin" | "menu" | "punch" | "supplement" | "overtime" | "success";
+type View = "pin" | "punch" | "supplement" | "overtime" | "success";
 
 interface MissingPunch {
   date: string;
   shift: string;
   missing: "in" | "out";
+  existing_time: string;
+}
+
+/** Default supplement time based on shift + missing type */
+function defaultSupTime(shift: string, missing: "in" | "out"): string {
+  if (shift === "早班") return missing === "in" ? "10:00" : "14:00";
+  return missing === "in" ? "16:00" : "20:00";
 }
 
 function nowTaipei(): string {
@@ -49,7 +56,8 @@ export default function Home() {
   const [customTs, setCustomTs] = useState("");
   const [supDate, setSupDate] = useState("");
   const [supKind, setSupKind] = useState<PunchKind>("in");
-  const [supTime, setSupTime] = useState("09:00");
+  const [supTime, setSupTime] = useState("10:00");
+  const [supContext, setSupContext] = useState<MissingPunch | null>(null);
   const [otDate, setOtDate] = useState("");
   const [otStart, setOtStart] = useState("18:00");
   const [otEnd, setOtEnd] = useState("19:00");
@@ -60,7 +68,7 @@ export default function Home() {
 
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
-    setMissingPunches([]); setPinKey((k) => k + 1);
+    setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
   }
 
   async function handlePin(enteredPin: string) {
@@ -76,7 +84,7 @@ export default function Home() {
       setSuggested(data.suggested_kind ?? "in");
       setMissingPunches(data.missing_punches ?? []);
       setCustomTs(nowTaipeiLocal()); setSupDate(todayTaipei()); setOtDate(todayTaipei());
-      setView("menu");
+      setView("punch");
     } catch { setError("網路錯誤，請再試一次"); setPinKey((k) => k + 1); }
     finally { setLoading(false); }
   }
@@ -122,7 +130,9 @@ export default function Home() {
 
   function prefillFromMissing(mp: MissingPunch) {
     setSupDate(mp.date); setSupKind(mp.missing);
-    setSupTime(mp.missing === "in" ? "09:00" : "18:00"); setView("supplement");
+    setSupTime(defaultSupTime(mp.shift, mp.missing));
+    setSupContext(mp);
+    setView("supplement");
   }
 
   function handleBeeClick() {
@@ -147,9 +157,10 @@ export default function Home() {
           </div>
         )}
 
-        {view === "menu" && employee && (
+        {view === "punch" && employee && (
           <div className="flex flex-col items-center gap-6 pt-6">
             <p className="text-2xl font-bold text-gray-800">{employee}</p>
+
             {missingPunches.length > 0 && (
               <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4">
                 <p className="mb-2 text-sm font-semibold text-amber-800">⚠️ 缺卡紀錄</p>
@@ -157,23 +168,15 @@ export default function Home() {
                   <button key={i} onClick={() => prefillFromMissing(mp)}
                     className="mb-1 block w-full rounded-lg bg-amber-100 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200">
                     {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
+                    {mp.existing_time && (
+                      <span className="ml-1 text-xs text-amber-700">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
+                    )}
                     <span className="ml-2 text-xs text-amber-600">點擊補登 →</span>
                   </button>
                 ))}
               </div>
             )}
-            <div className="flex w-full max-w-sm flex-col gap-3">
-              <MenuButton label="打卡" emoji="⏰" desc="上班 / 下班" onClick={() => setView("punch")} />
-              <MenuButton label="補登打卡" emoji="📝" desc="補登缺少的打卡" onClick={() => setView("supplement")} />
-              <MenuButton label="加班申請" emoji="🕐" desc="申報加班時數" onClick={() => setView("overtime")} />
-            </div>
-            <button onClick={resetToPin} className="text-sm text-gray-400 underline-offset-2 hover:underline">取消</button>
-          </div>
-        )}
 
-        {view === "punch" && employee && (
-          <div className="flex flex-col items-center gap-8 pt-10">
-            <p className="text-2xl font-bold text-gray-800">{employee}</p>
             <div className="w-full max-w-sm">
               <label className="mb-1 block text-xs text-gray-400">打卡時間（測試用）</label>
               <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
@@ -184,7 +187,19 @@ export default function Home() {
               <DirectionButton label="上班" emoji="🟢" suggested={suggested === "in"} onClick={() => handlePunch("in")} />
               <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
             </div>
-            <button onClick={() => setView("menu")} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+
+            <div className="flex w-full max-w-sm gap-3 pt-2">
+              <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
+                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
+                📝 補登打卡
+              </button>
+              <button onClick={() => setView("overtime")}
+                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
+                🕐 加班申請
+              </button>
+            </div>
+
+            <button onClick={resetToPin} className="text-sm text-gray-400 underline-offset-2 hover:underline">取消</button>
           </div>
         )}
 
@@ -192,6 +207,20 @@ export default function Home() {
           <div className="flex flex-col items-center gap-6 pt-8">
             <p className="text-2xl font-bold text-gray-800">{employee}・補登打卡</p>
             {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+
+            {supContext && supContext.existing_time && (
+              <div className="w-full max-w-sm rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p className="text-sm text-blue-800">
+                  📋 {supContext.date} {supContext.shift}
+                  {" "}已有<span className="font-semibold">{supContext.missing === "out" ? "上班" : "下班"}</span>紀錄：
+                  <span className="font-bold">{supContext.existing_time}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-600">
+                  請補登{supContext.missing === "in" ? "上班" : "下班"}時間
+                </p>
+              </div>
+            )}
+
             <div className="w-full max-w-sm space-y-4">
               <Field label="日期">
                 <input type="date" value={supDate} onChange={(e) => setSupDate(e.target.value)}
@@ -212,7 +241,7 @@ export default function Home() {
                 {loading ? "送出中…" : "送出補登"}
               </button>
             </div>
-            <button onClick={() => { setError(null); setView("menu"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+            <button onClick={() => { setError(null); setSupContext(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
           </div>
         )}
 
@@ -247,7 +276,7 @@ export default function Home() {
                 {loading ? "送出中…" : "送出申請"}
               </button>
             </div>
-            <button onClick={() => { setError(null); setView("menu"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
           </div>
         )}
 

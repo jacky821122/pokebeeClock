@@ -406,6 +406,7 @@ export interface MissingPunch {
   date: string;
   shift: string;
   missing: "in" | "out";
+  existing_time: string; // the raw time of the punch that IS present (e.g. "10:03")
 }
 
 /**
@@ -427,11 +428,15 @@ export async function getMissingPunches(employee: string, yyyyMm: string): Promi
       const note = String(r[9] ?? "");
       const date = String(r[1] ?? "");
       const shift = String(r[2] ?? "");
+      const inRaw = String(r[3] ?? "");
+      const outRaw = String(r[5] ?? "");
       if (note.includes("缺下班打卡")) {
-        results.push({ date, shift, missing: "out" });
+        // out is missing → in is the existing punch
+        results.push({ date, shift, missing: "out", existing_time: inRaw });
       }
       if (note.includes("缺上班打卡")) {
-        results.push({ date, shift, missing: "in" });
+        // in is missing → out is the existing punch
+        results.push({ date, shift, missing: "in", existing_time: outRaw });
       }
     }
     return results;
