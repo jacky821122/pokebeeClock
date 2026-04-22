@@ -1,16 +1,56 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import PinPad from "@/components/PinPad";
-import PunchView from "@/components/clock/PunchView";
-import SupplementView from "@/components/clock/SupplementView";
-import OvertimeView from "@/components/clock/OvertimeView";
 import type { PunchKind } from "@/types";
-import type { MissingPunch, OtRecord } from "@/components/clock/shared";
-import { nowTaipeiLocal, todayTaipei, toClientTs, hmToMin } from "@/components/clock/shared";
 
 type View = "pin" | "punch" | "supplement" | "overtime" | "success";
+
+interface MissingPunch {
+  date: string;
+  shift: string;
+  missing: "in" | "out";
+  existing_time: string;
+}
+
+interface OtRecord {
+  submitted_at: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  minutes: number;
+  reason: string;
+}
+
+/** Default supplement time based on shift + missing type */
+function defaultSupTime(shift: string, missing: "in" | "out"): string {
+  if (shift === "早班") return missing === "in" ? "10:00" : "14:00";
+  return missing === "in" ? "16:00" : "20:00";
+}
+
+function nowTaipei(): string {
+  const now = new Date();
+  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.toISOString().replace("Z", "+08:00");
+}
+
+function nowTaipeiLocal(): string {
+  return nowTaipei().slice(0, 16);
+}
+
+function todayTaipei(): string {
+  return nowTaipei().slice(0, 10);
+}
+
+function toClientTs(local: string): string {
+  return local ? `${local}:00+08:00` : nowTaipei();
+}
+
+function hmToMin(hm: string): number {
+  const [h, m] = hm.split(":").map(Number);
+  return h * 60 + m;
+}
 
 export default function Home() {
   const [view, setView] = useState<View>("pin");
@@ -132,8 +172,10 @@ export default function Home() {
     loadOtRecords();
   }
 
-  function handleGoSupplement(date: string, kind: PunchKind, time: string, context: MissingPunch | null) {
-    setSupDate(date); setSupKind(kind); setSupTime(time); setSupContext(context);
+  function prefillFromMissing(mp: MissingPunch) {
+    setSupDate(mp.date); setSupKind(mp.missing);
+    setSupTime(defaultSupTime(mp.shift, mp.missing));
+    setSupContext(mp);
     setView("supplement");
   }
 
@@ -160,34 +202,167 @@ export default function Home() {
         )}
 
         {view === "punch" && employee && (
-          <PunchView
-            employee={employee} pin={pin} suggested={suggested}
-            missingPunches={missingPunches} customTs={customTs}
-            onCustomTsChange={setCustomTs} onPunch={handlePunch}
-            onSupplement={handleGoSupplement} onGoOvertime={goToOvertime}
-            onCancel={resetToPin} setMissingPunches={setMissingPunches}
-          />
+          <div className="flex flex-col items-center gap-6 pt-6">
+            <p className="text-2xl font-bold text-gray-800">{employee}</p>
+
+            {missingPunches.length > 0 && (
+              <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <p className="mb-2 text-sm font-semibold text-amber-800">⚠️ 缺卡紀錄</p>
+                {missingPunches.map((mp, i) => (
+                  <button key={i} onClick={() => prefillFromMissing(mp)}
+                    className="mb-1 block w-full rounded-lg bg-amber-100 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200">
+                    {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
+                    {mp.existing_time && (
+                      <span className="ml-1 text-xs text-amber-700">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
+                    )}
+                    <span className="ml-2 text-xs text-amber-600">點擊補登 →</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="w-full max-w-sm">
+              <label className="mb-1 block text-xs text-gray-400">打卡時間（測試用）</label>
+              <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+            </div>
+            <p className="text-sm text-gray-500">選擇打卡類型</p>
+            <div className="flex w-full max-w-sm flex-col gap-4">
+              <DirectionButton label="上班" emoji="🟢" suggested={suggested === "in"} onClick={() => handlePunch("in")} />
+              <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
+            </div>
+
+            <div className="flex w-full max-w-sm gap-3 pt-2">
+              <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
+                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
+                📝 補登打卡
+              </button>
+              <button onClick={goToOvertime}
+                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
+                🕐 加班申請
+              </button>
+            </div>
+
+            <button onClick={resetToPin} className="text-sm text-gray-400 underline-offset-2 hover:underline">取消</button>
+          </div>
         )}
 
         {view === "supplement" && employee && (
-          <SupplementView
-            employee={employee} loading={loading} error={error}
-            supDate={supDate} supKind={supKind} supTime={supTime} supContext={supContext}
-            onSupDateChange={setSupDate} onSupKindChange={setSupKind} onSupTimeChange={setSupTime}
-            onSubmit={handleSupplement}
-            onBack={() => { setError(null); setSupContext(null); setView("punch"); }}
-          />
+          <div className="flex flex-col items-center gap-6 pt-8">
+            <p className="text-2xl font-bold text-gray-800">{employee}・補登打卡</p>
+            {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+
+            {supContext && supContext.existing_time && (
+              <div className="w-full max-w-sm rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <p className="text-sm text-blue-800">
+                  📋 {supContext.date} {supContext.shift}
+                  {" "}已有<span className="font-semibold">{supContext.missing === "out" ? "上班" : "下班"}</span>紀錄：
+                  <span className="font-bold">{supContext.existing_time}</span>
+                </p>
+                <p className="mt-1 text-xs text-blue-600">
+                  請補登{supContext.missing === "in" ? "上班" : "下班"}時間
+                </p>
+              </div>
+            )}
+
+            <div className="w-full max-w-sm space-y-4">
+              <Field label="日期">
+                <input type="date" value={supDate} onChange={(e) => setSupDate(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              <Field label="類型">
+                <div className="flex gap-3">
+                  <ToggleBtn active={supKind === "in"} onClick={() => setSupKind("in")}>上班</ToggleBtn>
+                  <ToggleBtn active={supKind === "out"} onClick={() => setSupKind("out")}>下班</ToggleBtn>
+                </div>
+              </Field>
+              <Field label="時間">
+                <input type="time" value={supTime} onChange={(e) => setSupTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              <button onClick={handleSupplement} disabled={loading}
+                className="w-full rounded-2xl bg-stone-800 py-4 text-lg font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                {loading ? "送出中…" : "送出補登"}
+              </button>
+            </div>
+            <button onClick={() => { setError(null); setSupContext(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+          </div>
         )}
 
         {view === "overtime" && employee && (
-          <OvertimeView
-            employee={employee} loading={loading} error={error}
-            otDate={otDate} otStart={otStart} otEnd={otEnd} otReason={otReason}
-            otRecords={otRecords} otLoading={otLoading}
-            onOtDateChange={setOtDate} onOtStartChange={setOtStart}
-            onOtEndChange={setOtEnd} onOtReasonChange={setOtReason}
-            onSubmit={handleOvertime} onRevoke={revokeOt} onBack={() => { setError(null); setView("punch"); }}
-          />
+          <div className="flex flex-col items-center gap-6 pt-8">
+            <p className="text-2xl font-bold text-gray-800">{employee}・加班申請</p>
+            {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+            <div className="w-full max-w-sm space-y-4">
+              <Field label="日期">
+                <input type="date" value={otDate} onChange={(e) => setOtDate(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              <Field label="開始時間">
+                <input type="time" value={otStart} onChange={(e) => setOtStart(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              <Field label="結束時間">
+                <input type="time" value={otEnd} onChange={(e) => setOtEnd(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              <Field label="原因（選填）">
+                <input type="text" value={otReason} onChange={(e) => setOtReason(e.target.value)}
+                  placeholder="例：活動準備、盤點…"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+              </Field>
+              {otStart && otEnd && (() => {
+                const diff = hmToMin(otEnd) - hmToMin(otStart);
+                const rounded = diff > 0 ? Math.floor(diff / 15) * 15 : 0;
+                return rounded > 0 ? (
+                  <p className="text-center text-sm text-gray-500">
+                    加班時數：<span className="font-semibold text-gray-800">{rounded} 分鐘</span>（{(rounded / 60).toFixed(2)} 小時）
+                  </p>
+                ) : null;
+              })()}
+              <button onClick={handleOvertime} disabled={loading}
+                className="w-full rounded-2xl bg-stone-800 py-4 text-lg font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                {loading ? "送出中…" : "送出申請"}
+              </button>
+            </div>
+
+            {/* Recent overtime requests */}
+            <div className="w-full max-w-sm">
+              <p className="mb-2 text-sm font-semibold text-gray-600">最近申請紀錄</p>
+              {otLoading ? (
+                <p className="text-xs text-gray-400">載入中…</p>
+              ) : otRecords.length === 0 ? (
+                <p className="text-xs text-gray-400">無申請紀錄</p>
+              ) : (
+                <div className="space-y-2">
+                  {otRecords.map((r) => {
+                    const ageMs = Date.now() - new Date(r.submitted_at).getTime();
+                    const canRevoke = ageMs < 24 * 60 * 60 * 1000;
+                    return (
+                      <div key={r.submitted_at} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2">
+                        <div className="text-sm text-gray-700">
+                          <span className="font-medium">{r.date}</span>{" "}
+                          <span className="text-gray-500">{r.start_time}-{r.end_time}</span>{" "}
+                          <span className="text-xs text-gray-400">({r.minutes}分)</span>
+                          {r.reason && <span className="ml-1 text-xs text-gray-400">| {r.reason}</span>}
+                        </div>
+                        {canRevoke ? (
+                          <button onClick={() => revokeOt(r.submitted_at)} disabled={loading}
+                            className="ml-2 shrink-0 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-40">
+                            撤回
+                          </button>
+                        ) : (
+                          <span className="ml-2 text-xs text-gray-300">已逾時</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+          </div>
         )}
 
         {view === "success" && (
@@ -198,5 +373,32 @@ export default function Home() {
         )}
       </main>
     </div>
+  );
+}
+
+function DirectionButton({ label, emoji, suggested, onClick }: { label: string; emoji: string; suggested: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 ${
+        suggested ? "bg-stone-800 text-white ring-4 ring-stone-300" : "bg-white text-gray-700"
+      }`}>
+      <span>{emoji}</span><span>{label}</span>
+      {suggested && <span className="text-xs font-normal opacity-70">（建議）</span>}
+    </button>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (<div><label className="mb-1 block text-sm font-medium text-gray-600">{label}</label>{children}</div>);
+}
+
+function ToggleBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${
+        active ? "bg-stone-800 text-white" : "bg-stone-100 text-gray-500"
+      }`}>
+      {children}
+    </button>
   );
 }
