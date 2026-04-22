@@ -4,15 +4,11 @@
 
 ---
 
-## Requests（待辦- 2026-04-20 — V2 analyzer 改版：取消自動加班、缺打卡改 0hr+flag、正職扣 2hr 空班、計時每班 cap 4hr / 日 cap 8hr、班別簡化為早班/晚班、normalize 統一 roundToHalfHour；全日班偵測（normOut>=15:00）拆為缺兩筆打卡；超時 flag 改用實際時數判定 (116b210)/ 想法池）
+## Requests（待辦 / 想法池）
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-1. ~~**加班申請系統**~~ — ✅ 已完成（`/api/overtime` + UI + `overtime_requests` tab）
-2. ~~**補打卡 UI**~~ — ✅ 已完成（補登打卡 UI + `source=supplement` + triggerTs 用 client_ts）
-3. ~~**打卡頁缺打卡提示**~~ — ✅ 已完成（`/api/identify` 回傳 `missing_punches`，含已存在紀錄時間）
-4. ~~**報表整合加班申請**~~ — ✅ 已完成（`report_generator.ts` 讀取 `overtime_requests`，加計加班時數，摘要顯示明細）
-5. **打卡頁 device token 驗證** — 防止知道 URL 就能打卡。iPad 初次設定時輸入 setup code 存 localStorage，之後每次 punch API call 帶 token；失效只需改 env var，無 session 過期問題。
+1. **打卡頁 device token 驗證** — 防止知道 URL 就能打卡。iPad 初次設定時輸入 setup code 存 localStorage，之後每次 punch API call 帶 token；失效只需改 env var，無 session 過期問題。
 6. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
 7. **展示層報表實機驗證** — 用真實資料跑 `scripts/generate_report.ts`，比對舊版 V1 output 差異。
@@ -78,6 +74,13 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-20 — 補登後樂觀移除對應缺卡提示；補登/加班 fire-and-forget 快速回應、成功後回主畫面不登出 (90ac464)
+- 2026-04-20 — 加班申請：最近紀錄與 24 小時內撤回功能 (a9026cd)
+- 2026-04-20 — 全員工重算 API（批次讀取優化）、加班申請 reason 欄位、iOS 時間輸入溢出修正 (d103a46)
+- 2026-04-20 — 補登建議：只顯示過去日期的缺卡，不顯示今天 (d9df4fa)
+- 2026-04-21 — 正職超時 flag 修正：`handleFullTime` 改用原始打卡時差（非 normalize 後）判定 >10hr15min
+- 2026-04-21 — page.tsx 重構：拆出 `PunchView`、`SupplementView`、`OvertimeView`、`shared` 至 `src/components/clock/`（405→202 行）
+- 2026-04-21 — Google Sheets API retry/backoff：`withRetryProxy` 自動重試 429/5xx，指數退避 3 次
 - 2026-04-20 — 報表整合加班申請：`report_generator.ts` 讀取 `overtime_requests`，加計加班時數至摘要，顯示各筆加班明細
 - 2026-04-20 — UI 改版：PIN 後直接到打卡頁、缺卡顯示已存在紀錄與建議補登時間（依班別）、補登打卡 + 加班申請 UI
 - 2026-04-20 — 統一 PIN 流程 + 補登打卡 + 加班申請 API（`/api/punch` source=supplement、`/api/overtime`、`/api/identify` 回傳缺卡紀錄）
