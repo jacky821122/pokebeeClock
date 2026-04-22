@@ -2,6 +2,61 @@ import { google } from "googleapis";
 import type { Employee, Punch } from "@/types";
 import type { PairRecord } from "@/lib/analyzer";
 
+// ── retry helper ─────────────────────────────────────────────────────────────
+
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 500;
+
+/**
+ * Retry an async function with exponential backoff on transient Google API errors.
+ */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastError = err;
+      const status = (err as { code?: number }).code ?? 0;
+      const retryable = [429, 500, 502, 503, 504].includes(status);
+      if (!retryable || attempt === MAX_RETRIES) throw err;
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 200;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Wrap a Google Sheets API instance so that every method call (get, update,
+ * append, batchUpdate, etc.) is automatically retried on transient errors.
+ * This avoids touching every call site individually.
+ */
+function withRetryProxy<T extends object>(target: T): T {
+  return new Proxy(target, {
+    get(obj, prop) {
+      const val = (obj as Record<string | symbol, unknown>)[prop];
+      if (typeof val === "function") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (...args: any[]) => {
+          const result = (val as Function).apply(obj, args);
+          // If it returns a promise (an API call), wrap with retry
+          if (result && typeof result.then === "function") {
+            // We can't simply retry the promise — we must retry the whole call
+            return withRetry(() => (val as Function).apply(obj, args));
+          }
+          return result;
+        };
+      }
+      // Recursively proxy nested objects (e.g. sheets.spreadsheets.values)
+      if (val && typeof val === "object") {
+        return withRetryProxy(val as object);
+      }
+      return val;
+    },
+  });
+}
+
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 const TAB_EMPLOYEES = "employees";
@@ -24,7 +79,7 @@ function getAuth() {
 }
 
 function getSheets() {
-  return google.sheets({ version: "v4", auth: getAuth() });
+  return withRetryProxy(google.sheets({ version: "v4", auth: getAuth() }));
 }
 
 function sid() {
