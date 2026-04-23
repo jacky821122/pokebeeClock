@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import PinPad from "@/components/PinPad";
 import type { PunchKind } from "@/types";

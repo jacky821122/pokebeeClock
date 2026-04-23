@@ -85,13 +85,14 @@ function handleFullTime(
     notes.push("缺下班打卡，需人工確認");
   } else {
     // Full-time: punch diff - 2hr break, cap 8hr
-    const rawHours = (outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000;
-    const worked = Math.max(rawHours - 2, 0);
+    const normHours = (outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000;
+    const worked = Math.max(normHours - 2, 0);
     normal = Math.min(worked, 8.0);
 
-    // Flag if raw punch diff > 10hr 15min
-    if (rawHours > 10.25) {
-      notes.push(`上班時間 ${fmtHours(rawHours)} 小時（扣除空班後超過 8 小時 15 分），請確認是否需申請加班`);
+    // Flag if raw punch diff > 10hr 15min (use original timestamps, not normalized)
+    const rawDiffHours = (outTs!.getTime() - inTs!.getTime()) / 3600 / 1000;
+    if (rawDiffHours > 10.25) {
+      notes.push(`上班時間 ${fmtHours(rawDiffHours)} 小時（超過 10 小時 15 分），請確認是否需申請加班`);
     }
   }
 

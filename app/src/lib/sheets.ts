@@ -23,8 +23,45 @@ function getAuth() {
   return new google.auth.GoogleAuth({ credentials: JSON.parse(sa), scopes: SCOPES });
 }
 
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 500;
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastError = err;
+      const status = (err as { code?: number }).code ?? 0;
+      if (![429, 500, 502, 503, 504].includes(status) || attempt === MAX_RETRIES) throw err;
+      await new Promise((r) => setTimeout(r, BASE_DELAY_MS * 2 ** attempt + Math.random() * 200));
+    }
+  }
+  throw lastError;
+}
+
+function withRetryProxy<T extends object>(target: T): T {
+  return new Proxy(target, {
+    get(obj, prop) {
+      const val = (obj as Record<string | symbol, unknown>)[prop];
+      if (typeof val === "function") {
+        return (...args: unknown[]) => {
+          const result = (val as Function).apply(obj, args);
+          if (result && typeof result.then === "function") {
+            return withRetry(() => (val as Function).apply(obj, args));
+          }
+          return result;
+        };
+      }
+      if (val && typeof val === "object") return withRetryProxy(val as object);
+      return val;
+    },
+  });
+}
+
 function getSheets() {
-  return google.sheets({ version: "v4", auth: getAuth() });
+  return withRetryProxy(google.sheets({ version: "v4", auth: getAuth() }));
 }
 
 function sid() {
@@ -424,7 +461,8 @@ export async function getMissingPunches(employee: string, yyyyMm: string): Promi
     const rows = res.data.values ?? [];
     const results: MissingPunch[] = [];
     // Only flag missing punches for past dates — today's record is still in progress
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const now = new Date();
+    const today = new Date(now.getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10); // YYYY-MM-DD (Taipei)
     for (const r of rows.slice(1)) {
       if (r[0] !== employee) continue;
       const note = String(r[9] ?? "");
