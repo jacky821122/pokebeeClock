@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPin, appendPunch } from "@/lib/sheets";
 import { reanalyzeEmployee } from "@/lib/analyzer_bridge";
+import { nowTaipei } from "@/lib/time";
 import type { Punch, PunchKind } from "@/types";
-
-function nowTaipei(): string {
-  const now = new Date();
-  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  return tw.toISOString().replace("Z", "+08:00");
-}
 
 export async function POST(req: NextRequest) {
   try {

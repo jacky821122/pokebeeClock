@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPin, getLastPunchKind, getMissingPunches } from "@/lib/sheets";
+import { currentYyyyMm } from "@/lib/time";
 import type { PunchKind } from "@/types";
-
-function currentYyyyMm(): string {
-  const now = new Date();
-  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  return tw.toISOString().slice(0, 7);
-}
 
 export async function POST(req: NextRequest) {
   try {

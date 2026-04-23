@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPin, appendOvertimeRequest, getRecentOvertimeRequests, deleteOvertimeRequest } from "@/lib/sheets";
-
-function nowTaipei(): string {
-  const now = new Date();
-  const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  return tw.toISOString().replace("Z", "+08:00");
-}
+import { nowTaipei, hmToMin } from "@/lib/time";
 
 /**
  * Round minutes down to nearest 15-min unit.
  */
 function roundTo15(mins: number): number {
   return Math.floor(mins / 15) * 15;
-}
-
-/**
- * Parse "HH:mm" to minutes since midnight.
- */
-function hmToMinutes(hm: string): number {
-  const [h, m] = hm.split(":").map(Number);
-  return h * 60 + m;
 }
 
 export async function POST(req: NextRequest) {
@@ -41,7 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
     }
 
-    const diffMin = hmToMinutes(end_time) - hmToMinutes(start_time);
+    const diffMin = hmToMin(end_time) - hmToMin(start_time);
     if (diffMin <= 0) {
       return NextResponse.json({ error: "結束時間必須晚於開始時間" }, { status: 400 });
     }
