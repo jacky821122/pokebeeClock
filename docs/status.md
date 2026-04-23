@@ -74,6 +74,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-23 — 代碼清理 P1+P2：修 UTC 時區 bug（getMissingPunches/currentYyyyMm）、正職超時 flag 改用原始時差、移除未用 useEffect import、抽出共用 `lib/time.ts`（nowTaipei/todayTaipei/currentYyyyMm/hmToMin）、Sheets API 加 retry/backoff
 - 2026-04-20 — 補登後樂觀移除對應缺卡提示；補登/加班 fire-and-forget 快速回應、成功後回主畫面不登出 (90ac464)
 - 2026-04-20 — 加班申請：最近紀錄與 24 小時內撤回功能 (a9026cd)
 - 2026-04-20 — 全員工重算 API（批次讀取優化）、加班申請 reason 欄位、iOS 時間輸入溢出修正 (d103a46)
