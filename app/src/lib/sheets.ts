@@ -46,13 +46,8 @@ function withRetryProxy<T extends object>(target: T): T {
     get(obj, prop) {
       const val = (obj as Record<string | symbol, unknown>)[prop];
       if (typeof val === "function") {
-        return (...args: unknown[]) => {
-          const result = (val as Function).apply(obj, args);
-          if (result && typeof result.then === "function") {
-            return withRetry(() => (val as Function).apply(obj, args));
-          }
-          return result;
-        };
+        return (...args: unknown[]) =>
+          withRetry(() => (val as Function).apply(obj, args));
       }
       if (val && typeof val === "object") return withRetryProxy(val as object);
       return val;
