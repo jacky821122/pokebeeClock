@@ -41,22 +41,13 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   throw lastError;
 }
 
-function withRetryProxy<T extends object>(target: T): T {
-  return new Proxy(target, {
-    get(obj, prop) {
-      const val = (obj as Record<string | symbol, unknown>)[prop];
-      if (typeof val === "function") {
-        return (...args: unknown[]) =>
-          withRetry(() => (val as Function).apply(obj, args));
-      }
-      if (val && typeof val === "object") return withRetryProxy(val as object);
-      return val;
-    },
-  });
+function getSheets() {
+  return google.sheets({ version: "v4", auth: getAuth() });
 }
 
-function getSheets() {
-  return withRetryProxy(google.sheets({ version: "v4", auth: getAuth() }));
+/** Wrap an async call with retry for transient Google API errors (429/5xx). */
+async function retry<T>(fn: () => Promise<T>): Promise<T> {
+  return withRetry(fn);
 }
 
 function sid() {
