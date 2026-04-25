@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand: #3d2418;
+  --color-brand-soft: #5a3a28;
+  --color-brand-cream: #fdf8f3;
+  --color-brand-sand: #f5ebdc;
+  --color-brand-accent: #a8763e;
+}
+
 @layer base {
   html {
     overflow-x: hidden;
