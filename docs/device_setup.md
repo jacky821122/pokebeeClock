@@ -38,6 +38,9 @@ DEVICE_TOKENS=ipad-store|a1b2c3d4...,phone-jacky|9f8e7d6c...
 
 ## 3. 各裝置完成 setup
 
+> **iOS 重要**：Safari 與「加到主畫面」的 PWA 是**分開的 storage**，要分別跑一次 setup。先在 Safari 設好確認能用，再加到主畫面、從主畫面圖示打開 PWA、再貼一次同樣的 token。詳見下方 FAQ。
+
+
 ### 方法 A：URL 直接帶 code（推薦）
 
 把帶 code 的 URL 在該裝置上打開：
@@ -97,7 +100,11 @@ A: 技術上可以（server 端只比對字串），但失去 label 追蹤的意
 A: 會。token 存在 localStorage，清掉就要重新 setup（重新打開 `/setup?code=...` 即可，token 本身不變）。
 
 **Q: PWA 裝到主畫面後，token 還在嗎？**
-A: 在。PWA 與 Safari 共享同一個 origin 的 localStorage。
+A: **iOS Safari 與 PWA 是分開的 storage**——加到主畫面後 PWA 會建獨立 sandbox，看不到 Safari 那邊的 localStorage。所以 iPad / iPhone 上要：
+  1. Safari 打開 `/setup?code=xxx` → 設定一次（為了能在 Safari 內用）
+  2. 加到主畫面 → 從主畫面圖示打開 PWA → **再跑一次 setup**（PWA 會自動跳 `/setup`，貼同一個 token 即可）
+  
+  之後兩邊各自獨立運作，token 失效時也要兩邊各自重新設定。Android Chrome 不一定有此隔離（視版本而定），但建議照同樣流程跑一遍最保險。
 
 **Q: 為什麼不做 session/JWT 過期？**
 A: 打卡頁是長期常駐的店面 iPad，session 過期會造成「員工要打卡但要先請管理者重新登入」的麻煩。改 env var 是唯一的撤銷路徑——簡單、明確、不會自己過期。

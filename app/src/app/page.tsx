@@ -222,11 +222,13 @@ export default function Home() {
               </div>
             )}
 
-            <div className="w-full max-w-sm lg:max-w-md">
-              <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
-              <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 lg:px-4 lg:py-3 lg:text-base" />
-            </div>
+            {process.env.NODE_ENV === "development" && (
+              <div className="w-full max-w-sm lg:max-w-md">
+                <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
+                <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 lg:px-4 lg:py-3 lg:text-base" />
+              </div>
+            )}
             <p className="text-sm text-gray-500 lg:text-lg">選擇打卡類型</p>
             <div className="flex w-full max-w-sm flex-col gap-4 lg:max-w-md lg:gap-5">
               <DirectionButton label="上班" emoji="🟢" suggested={suggested === "in"} onClick={() => handlePunch("in")} />
