@@ -190,18 +190,15 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh bg-brand-cream">
-      <div className="bg-brand px-4 py-3 flex items-center gap-3 shadow-sm">
-        <button onClick={handleBeeClick} aria-label="logo" className="select-none rounded-full transition-transform active:scale-90">
-          <Image src="/icon-192.png" alt="pokebee" width={36} height={36} priority className="rounded-full" />
-        </button>
+      <div className="bg-brand px-4 py-4 flex items-center gap-3 shadow-sm">
+        <button onClick={handleBeeClick} aria-label="logo" className="text-2xl select-none focus:outline-none">🐝</button>
         <h1 className="text-lg font-bold text-brand-cream tracking-wide">pokebee 打卡</h1>
         <span className="ml-auto text-xs text-brand-cream/40">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
       </div>
 
       <main className="mx-auto w-full max-w-lg px-4 py-6 lg:max-w-2xl lg:py-10">
         {view === "pin" && (
-          <div className="flex flex-col items-center justify-center gap-4 pt-2">
-            <Image src="/icon-512.png" alt="pokebee" width={120} height={120} priority className="rounded-3xl shadow-md" />
+          <div className="flex items-center justify-center pt-4">
             <PinPad key={pinKey} onConfirm={handlePin} onCancel={null} loading={loading} error={error} />
           </div>
         )}
