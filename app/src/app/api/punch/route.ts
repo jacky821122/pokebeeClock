@@ -7,7 +7,7 @@ import type { Punch, PunchKind } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
-    const dev = checkDevice(req);
+    const dev = await checkDevice(req);
     if (!dev.ok) return dev.res;
 
     const body = await req.json();

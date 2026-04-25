@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getActiveDevices } from "@/lib/sheets";
 
 export interface Device {
   label: string;
@@ -6,31 +7,26 @@ export interface Device {
 }
 
 /**
- * Parse DEVICE_TOKENS env var. Format: "label1|token1,label2|token2".
- * Empty/unset env disables enforcement (returns []).
+ * Read active devices from the Sheet `devices` tab. Empty list (tab missing
+ * or no active rows) disables enforcement — friendly for dev / first install.
  */
-export function getDevices(): Device[] {
-  const raw = process.env.DEVICE_TOKENS?.trim();
-  if (!raw) return [];
-  return raw.split(",").map((entry) => {
-    const [label, token] = entry.split("|").map((s) => s.trim());
-    return { label: label ?? "", token: token ?? "" };
-  }).filter((d) => d.token);
+export async function getDevices(): Promise<Device[]> {
+  return getActiveDevices();
 }
 
-export function findDeviceByToken(token: string): Device | null {
-  return getDevices().find((d) => d.token === token) ?? null;
+export async function findDeviceByToken(token: string): Promise<Device | null> {
+  return (await getDevices()).find((d) => d.token === token) ?? null;
 }
 
 /**
- * Validate `x-device-token` header against env. Returns the matched label,
- * or "" if enforcement is disabled (empty env). Throws a 401 NextResponse
- * via { res } when the token is invalid.
+ * Validate `x-device-token` header against the Sheet. Returns the matched
+ * label, or "" if enforcement is disabled (empty devices list).
  */
-export function checkDevice(req: NextRequest):
+export async function checkDevice(req: NextRequest): Promise<
   | { ok: true; label: string }
-  | { ok: false; res: NextResponse } {
-  const devices = getDevices();
+  | { ok: false; res: NextResponse }
+> {
+  const devices = await getDevices();
   if (devices.length === 0) return { ok: true, label: "" };
   const token = req.headers.get("x-device-token") ?? "";
   const dev = devices.find((d) => d.token === token);

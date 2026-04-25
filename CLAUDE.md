@@ -12,6 +12,7 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 - **PIN is stored as plaintext.** A 4-digit PIN hash offers no meaningful protection (10k possibilities, trivially reversible); the real boundary is Sheet access control + `ADMIN_SECRET`. Do not reintroduce hashing — it adds complexity without security.
 - **Main app has no user auth by design.** The iPad's physical location and the manager's always-on Google session are the barrier. Do not add a login screen to the punch flow.
 - **`/admin` and admin API routes require `Authorization: Bearer $ADMIN_SECRET`.**
+- **Device tokens are stored plaintext in the Sheet's `devices` tab.** Same reasoning as PIN — the boundary is Sheet edit access, not token secrecy. Do not move device tokens to env or add hashing. Empty/missing tab disables enforcement (dev-friendly).
 
 ## Analyzer
 

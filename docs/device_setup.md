@@ -2,9 +2,22 @@
 
 打卡頁無 user auth，靠 device token 防止「知道 URL 就能打卡」。每個被授權的裝置（iPad、個人手機）配一組 token，存在該瀏覽器的 localStorage，每次打卡 API 自動帶 header 驗證。
 
+授權清單放在 Google Sheet 的 `devices` tab——管理權與 PIN、employees 一致（誰有 Sheet 編輯權誰能改），不需碰 Vercel。
+
 ---
 
-## 1. 產生 token
+## 1. 在 Sheet 建 `devices` tab（一次性）
+
+開試算表，新增分頁 `devices`，第一列 header：
+
+| label | token | active |
+|---|---|---|
+
+> 沒有 `devices` tab 或 active 列為空 → server 端**不啟用**驗證（任何 request 都過）。dev/初次安裝友善，但 production 一定要建好。
+
+---
+
+## 2. 產生 token
 
 每台裝置一組獨立 token。本機產生，不上傳：
 
@@ -13,33 +26,26 @@ openssl rand -hex 16
 # 例：a1b2c3d4e5f67890a1b2c3d4e5f67890
 ```
 
-需要幾台就跑幾次。建議的 label 命名：地點/用途，方便日後從 `raw_punches` 表追溯。
+需要幾台就跑幾次。建議的 label 命名：地點/用途（例：`ipad-store`、`phone-jacky`），方便日後從 `raw_punches` 表追溯。
 
 ---
 
-## 2. 設定 Vercel env var
+## 3. 寫入 Sheet
 
-格式：`label1|token1,label2|token2`（comma 分隔多筆，pipe 分隔 label 與 token）。
+在 `devices` tab 新增一列：
 
-```
-DEVICE_TOKENS=ipad-store|a1b2c3d4...,phone-jacky|9f8e7d6c...
-```
+| label | token | active |
+|---|---|---|
+| ipad-store | a1b2c3d4... | TRUE |
+| phone-jacky | 9f8e7d6c... | TRUE |
 
-設定步驟：
-
-1. Vercel Dashboard → 專案 → Settings → Environment Variables
-2. Name: `DEVICE_TOKENS`，Value: 上面格式
-3. Environments 勾 **Production**（dev 不勾，本機跑就不啟用驗證，方便開發）
-4. Save → 觸發 redeploy（Deployments → 最新一筆 → Redeploy，或推一個 commit）
-
-> **注意**：env 為空或未設時，server 端**不啟用**驗證（任何 request 都過）。是設計如此，方便本機開發。Production 一定要設。
+存檔即生效，**不需 redeploy**。下一次 punch API 呼叫就會讀到新清單。
 
 ---
 
-## 3. 各裝置完成 setup
+## 4. 各裝置完成 setup
 
 > **iOS 重要**：Safari 與「加到主畫面」的 PWA 是**分開的 storage**，要分別跑一次 setup。先在 Safari 設好確認能用，再加到主畫面、從主畫面圖示打開 PWA、再貼一次同樣的 token。詳見下方 FAQ。
-
 
 ### 方法 A：URL 直接帶 code（推薦）
 
@@ -59,9 +65,11 @@ iPad 用法：在自己電腦上產好 URL，AirDrop / iMessage 傳到 iPad，Sa
 
 裝置上開 `https://<your-app>.vercel.app/setup`，把 token 貼進輸入框，按「完成設定」。
 
+> **生產環境一定要用 production domain**（你的 custom domain 或固定的 `*.vercel.app` alias），不要用 immutable preview URL（每次 deploy 會變）——否則下次 deploy 後 origin 不同，localStorage 看不到，會被迫重設。
+
 ---
 
-## 4. 驗證
+## 5. 驗證
 
 完成 setup 後：
 
@@ -71,22 +79,22 @@ iPad 用法：在自己電腦上產好 URL，AirDrop / iMessage 傳到 iPad，Sa
 
 ---
 
-## 5. 失效與撤銷
+## 6. 失效與撤銷
 
 ### 撤銷單一裝置（裝置遺失、員工離職）
 
-1. Vercel env var → 編輯 `DEVICE_TOKENS`，把該筆移掉
-2. Save → redeploy
+1. 編 `devices` tab，把該列的 `active` 改成 `FALSE`（或直接刪掉整列）
+2. 存檔即生效（無 cache，下次 API 呼叫立即拒絕）
 3. 該裝置下次 punch 會收到 401，自動跳 `/setup`，且 localStorage 裡舊 token 被清掉
 
 ### 全部重置
 
-把 `DEVICE_TOKENS` env var 整個刪掉 → 變回不啟用驗證（任何裝置都能打卡）。**只在緊急情況用**，平常別這樣。
+把 `devices` tab 整個清空（保留 header 即可）→ 變回不啟用驗證（任何裝置都能打卡）。**只在緊急情況用**，平常別這樣。
 
 ### 換 token（懷疑外洩但裝置還在）
 
 1. 重新跑 `openssl rand -hex 16` 產新 token
-2. 改 env var 把舊 token 換掉
+2. 改 Sheet 對應列的 token 欄
 3. 該裝置會 401 → 跳 `/setup` → 重新貼新 token
 
 ---
@@ -103,11 +111,14 @@ A: 會。token 存在 localStorage，清掉就要重新 setup（重新打開 `/s
 A: **iOS Safari 與 PWA 是分開的 storage**——加到主畫面後 PWA 會建獨立 sandbox，看不到 Safari 那邊的 localStorage。所以 iPad / iPhone 上要：
   1. Safari 打開 `/setup?code=xxx` → 設定一次（為了能在 Safari 內用）
   2. 加到主畫面 → 從主畫面圖示打開 PWA → **再跑一次 setup**（PWA 會自動跳 `/setup`，貼同一個 token 即可）
-  
+
   之後兩邊各自獨立運作，token 失效時也要兩邊各自重新設定。Android Chrome 不一定有此隔離（視版本而定），但建議照同樣流程跑一遍最保險。
 
 **Q: 為什麼不做 session/JWT 過期？**
-A: 打卡頁是長期常駐的店面 iPad，session 過期會造成「員工要打卡但要先請管理者重新登入」的麻煩。改 env var 是唯一的撤銷路徑——簡單、明確、不會自己過期。
+A: 打卡頁是長期常駐的店面 iPad，session 過期會造成「員工要打卡但要先請管理者重新登入」的麻煩。改 Sheet 是唯一的撤銷路徑——簡單、明確、不會自己過期。
 
 **Q: token 在網路上會被偷看嗎？**
 A: 全程 HTTPS（Vercel 預設）。中間人攔截需要破 TLS。實際風險比 token 寫在便利貼上被偷看高得多——別把 setup URL 截圖丟群組。
+
+**Q: 為什麼不加 cache？每次 punch 都讀一次 Sheet 不會慢嗎？**
+A: 流量很小（10-20 員工 × 每天 ~2 次打卡 < 100 次/天，平均 <1 req/min），Sheets API quota（60 reads/min/user）綽綽有餘。多 ~150ms 延遲跟原本 punch flow 已經多次讀 Sheet 比起來可忽略。換來的好處：撤銷即時生效，零 cache 失效邏輯。

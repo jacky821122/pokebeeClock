@@ -104,8 +104,9 @@ Required `.env.local`:
 GOOGLE_SA_JSON={"type":"service_account",...}
 ADMIN_SECRET=...
 SHEET_ID=...
-DEVICE_TOKENS=label1|token1,label2|token2  # optional in dev; required in prod, see docs/device_setup.md
 ```
+
+Device tokens are stored in the Sheet's `devices` tab (not env). See `docs/device_setup.md` for setup steps.
 
 Run tests and typecheck:
 

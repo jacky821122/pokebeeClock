@@ -6,12 +6,13 @@ export async function POST(req: NextRequest) {
     const { token } = (await req.json()) as { token: string };
     if (!token) return NextResponse.json({ error: "缺少 token" }, { status: 400 });
 
-    // If enforcement disabled, accept any token (label = "dev")
-    if (getDevices().length === 0) {
+    const devices = await getDevices();
+    if (devices.length === 0) {
+      // Enforcement disabled (devices tab empty/missing) — accept anything
       return NextResponse.json({ ok: true, label: "dev", enforced: false });
     }
 
-    const dev = findDeviceByToken(token);
+    const dev = await findDeviceByToken(token);
     if (!dev) return NextResponse.json({ error: "Token 無效" }, { status: 401 });
     return NextResponse.json({ ok: true, label: dev.label, enforced: true });
   } catch (err) {

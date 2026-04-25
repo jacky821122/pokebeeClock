@@ -73,6 +73,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-25 — Device token 來源從 env 改為 Sheet `devices` tab：管理權統一在 Sheet edit access、撤銷免 redeploy、無 cache 即時生效
 - 2026-04-25 — iPad 橫屏 (lg:) 放大 PinPad、打卡主畫面字級與按鈕
 - 2026-04-25 — Device token 驗證：env `DEVICE_TOKENS=label|token,...`、`/setup` 頁面、`apiFetch` 自動帶 header 並在 401 跳 /setup、`raw_punches` 加 device 欄
 - 2026-04-23 — 代碼清理 P1+P2：修 UTC 時區 bug（getMissingPunches/currentYyyyMm）、正職超時 flag 改用原始時差、移除未用 useEffect import、抽出共用 `lib/time.ts`（nowTaipei/todayTaipei/currentYyyyMm/hmToMin）、Sheets API 加 retry/backoff

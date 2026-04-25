@@ -8,10 +8,12 @@ const TAB_EMPLOYEES = "employees";
 const TAB_PUNCHES = "raw_punches";
 const TAB_AMENDMENTS = "amendments";
 const TAB_OVERTIME = "overtime_requests";
+const TAB_DEVICES = "devices";
 
 // employees:   name | pin | role | active
 // raw_punches: employee | client_ts | server_ts | source | kind | device
 // amendments:  submitted_at | employee | date | in_time | out_time | reason
+// devices:     label | token | active
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
@@ -499,6 +501,34 @@ export async function getMissingPunches(employee: string, yyyyMm: string): Promi
       }
     }
     return results;
+  } catch {
+    return [];
+  }
+}
+
+// ── devices ──────────────────────────────────────────────────────────────────
+
+export interface DeviceRow {
+  label: string;
+  token: string;
+}
+
+/**
+ * Read active devices. Returns [] if tab is missing or empty — callers
+ * interpret an empty list as "enforcement disabled".
+ */
+export async function getActiveDevices(): Promise<DeviceRow[]> {
+  const sheets = getSheets();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${TAB_DEVICES}!A:C`,
+    });
+    const rows = res.data.values ?? [];
+    return rows
+      .slice(1)
+      .filter((r) => r[1] && r[2]?.toString().toUpperCase() === "TRUE")
+      .map((r) => ({ label: String(r[0] ?? ""), token: String(r[1]) }));
   } catch {
     return [];
   }
