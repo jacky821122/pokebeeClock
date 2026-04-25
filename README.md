@@ -122,3 +122,4 @@ npm run typecheck
 - `docs/hours_analyzer_spec.md` — shift analysis rules
 - `docs/plan_analyzer_port.md` — TypeScript analyzer port notes
 - `CLAUDE.md` — hard constraints for AI coding sessions
+
