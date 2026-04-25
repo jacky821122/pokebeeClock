@@ -1,6 +1,6 @@
-import { getPunchesForMonth, getEmployeeRole, writeAnalyzedRecords, getActiveEmployees, getAllPunchesForMonth, type PunchRow } from "@/lib/sheets";
+import { getPunchesForMonth, getEmployeeRole, writeAnalyzedRecords, rewriteAnalyzedTab, getActiveEmployees, getAllPunchesForMonth, type PunchRow } from "@/lib/sheets";
 import { analyzeEmployee } from "@/lib/analyzer";
-import type { Event } from "@/lib/analyzer";
+import type { Event, PairRecord } from "@/lib/analyzer";
 
 /**
  * Parse a "+08:00" timestamp naively: extract Y/M/D/h/m/s from the string
@@ -86,6 +86,7 @@ export async function reanalyzeAllEmployees(yyyyMm: string): Promise<{ count: nu
 
   let count = 0;
   const errors: string[] = [];
+  const allRecords: PairRecord[] = [];
 
   for (const emp of employees) {
     try {
@@ -93,12 +94,14 @@ export async function reanalyzeAllEmployees(yyyyMm: string): Promise<{ count: nu
       const isFullTime = emp.role === "full_time";
       const events = punchesToEvents(rows);
       const { records } = analyzeEmployee(emp.name, events, isFullTime);
-      await writeAnalyzedRecords(yyyyMm, emp.name, records);
+      allRecords.push(...records);
       count++;
     } catch (err) {
       errors.push(`${emp.name}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+
+  await rewriteAnalyzedTab(yyyyMm, allRecords);
 
   return { count, total: employees.length, errors };
 }

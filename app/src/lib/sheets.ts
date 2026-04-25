@@ -423,6 +423,38 @@ export async function writeAnalyzedRecords(yyyyMm: string, employee: string, rec
   });
 }
 
+/**
+ * Rewrite the entire analyzed_YYYY-MM tab in one shot.
+ *
+ * Used by the batch reanalyze path so we don't hit Sheets read-quota limits
+ * (60/min/user) by reading + writing per-employee. Clears existing data and
+ * writes header + all records.
+ */
+export async function rewriteAnalyzedTab(yyyyMm: string, records: PairRecord[]): Promise<void> {
+  const sheets = getSheets();
+  const tab = `analyzed_${yyyyMm}`;
+  await ensureTab(sheets, tab);
+
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: sid(),
+    range: `${tab}!A:J`,
+  });
+
+  const values: (string | number)[][] = [
+    ["employee", "date", "shift", "in_raw", "in_norm", "out_raw", "out_norm", "normal_hours", "overtime_hours", "note"],
+  ];
+  for (const r of records) {
+    values.push([r.employee, r.date, r.shift, r.in_raw, r.in_norm, r.out_raw, r.out_norm, r.normal_hours, r.overtime_hours, r.note]);
+  }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sid(),
+    range: `${tab}!A1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  });
+}
+
 // ── missing punch detection ──────────────────────────────────────────────────
 
 export interface MissingPunch {
