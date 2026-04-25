@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPin, appendPunch } from "@/lib/sheets";
+import { checkDevice } from "@/lib/device";
 import { reanalyzeEmployee } from "@/lib/analyzer_bridge";
 import { nowTaipei } from "@/lib/time";
 import type { Punch, PunchKind } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
+    const dev = checkDevice(req);
+    if (!dev.ok) return dev.res;
+
     const body = await req.json();
     const { pin, client_ts, kind, source } = body as {
       pin: string;
@@ -33,6 +37,7 @@ export async function POST(req: NextRequest) {
       server_ts: nowTaipei(),
       source: effectiveSource,
       kind,
+      device: dev.label,
     };
 
     await appendPunch(punch);

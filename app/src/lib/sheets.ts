@@ -10,7 +10,7 @@ const TAB_AMENDMENTS = "amendments";
 const TAB_OVERTIME = "overtime_requests";
 
 // employees:   name | pin | role | active
-// raw_punches: employee | client_ts | server_ts | source | kind
+// raw_punches: employee | client_ts | server_ts | source | kind | device
 // amendments:  submitted_at | employee | date | in_time | out_time | reason
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
@@ -186,10 +186,10 @@ export async function appendPunch(punch: Punch): Promise<void> {
   const sheets = getSheets();
   await sheets.spreadsheets.values.append({
     spreadsheetId: sid(),
-    range: `${TAB_PUNCHES}!A:E`,
+    range: `${TAB_PUNCHES}!A:F`,
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[punch.employee, punch.client_ts, punch.server_ts, punch.source, punch.kind]],
+      values: [[punch.employee, punch.client_ts, punch.server_ts, punch.source, punch.kind, punch.device ?? ""]],
     },
   });
 }

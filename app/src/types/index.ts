@@ -12,4 +12,5 @@ export interface Punch {
   server_ts: string;
   source: "pwa" | "ichef-import" | "supplement";
   kind: PunchKind;
+  device?: string;
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPin, appendOvertimeRequest, getRecentOvertimeRequests, deleteOvertimeRequest } from "@/lib/sheets";
+import { checkDevice } from "@/lib/device";
 import { nowTaipei, hmToMin } from "@/lib/time";
 
 /**
@@ -11,6 +12,9 @@ function roundTo15(mins: number): number {
 
 export async function POST(req: NextRequest) {
   try {
+    const dev = checkDevice(req);
+    if (!dev.ok) return dev.res;
+
     const { pin, date, start_time, end_time, reason } = (await req.json()) as {
       pin: string;
       date: string;       // "YYYY-MM-DD"
@@ -56,6 +60,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const dev = checkDevice(req);
+    if (!dev.ok) return dev.res;
+
     const pin = req.nextUrl.searchParams.get("pin") ?? "";
     if (!pin) return NextResponse.json({ error: "Missing pin" }, { status: 400 });
 
@@ -72,6 +79,9 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const dev = checkDevice(req);
+    if (!dev.ok) return dev.res;
+
     const { pin, submitted_at } = (await req.json()) as { pin: string; submitted_at: string };
     if (!pin || !submitted_at) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 

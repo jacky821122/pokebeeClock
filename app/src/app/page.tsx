@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import PinPad from "@/components/PinPad";
+import { apiFetch } from "@/lib/device_client";
 import type { PunchKind } from "@/types";
 
 type View = "pin" | "punch" | "supplement" | "overtime" | "success";
@@ -86,7 +87,7 @@ export default function Home() {
   async function handlePin(enteredPin: string) {
     setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/identify", {
+      const res = await apiFetch("/api/identify", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin: enteredPin }),
       });
@@ -114,7 +115,7 @@ export default function Home() {
   function handlePunch(k: PunchKind) {
     if (!employee) return;
     showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`);
-    fetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
+    apiFetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts: toClientTs(customTs), kind: k }),
     }).catch(() => {});
   }
@@ -127,7 +128,7 @@ export default function Home() {
       (mp) => !(mp.date === supDate && mp.missing === supKind)
     ));
     showSuccessAndReturn(`${employee}・${supDate} ${supTime} 補登${supKind === "in" ? "上班" : "下班"}`);
-    fetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
+    apiFetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts, kind: supKind, source: "supplement" }),
     }).catch(() => {});
   }
@@ -138,7 +139,7 @@ export default function Home() {
     const minutes = diff > 0 ? Math.floor(diff / 15) * 15 : 0;
     if (minutes <= 0) { setError("加班時數不足 15 分鐘"); return; }
     showSuccessAndReturn(`${employee}・${otDate} 加班 ${minutes} 分鐘 申請成功`);
-    fetch("/api/overtime", { method: "POST", headers: { "Content-Type": "application/json" },
+    apiFetch("/api/overtime", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, date: otDate, start_time: otStart, end_time: otEnd, reason: otReason.trim() || undefined }),
     }).catch(() => {});
   }
@@ -147,7 +148,7 @@ export default function Home() {
     if (!pin) return;
     setOtLoading(true);
     try {
-      const res = await fetch(`/api/overtime?pin=${encodeURIComponent(pin)}`);
+      const res = await apiFetch(`/api/overtime?pin=${encodeURIComponent(pin)}`);
       const data = await res.json();
       if (res.ok) setOtRecords(data.records ?? []);
     } catch { /* ignore */ }
@@ -158,7 +159,7 @@ export default function Home() {
     if (!pin) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/overtime", { method: "DELETE", headers: { "Content-Type": "application/json" },
+      const res = await apiFetch("/api/overtime", { method: "DELETE", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin, submitted_at: submittedAt }),
       });
       const data = await res.json();
@@ -194,7 +195,7 @@ export default function Home() {
         <span className="ml-auto text-xs text-stone-500">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
       </div>
 
-      <main className="mx-auto w-full max-w-lg px-4 py-6">
+      <main className="mx-auto w-full max-w-lg px-4 py-6 lg:max-w-2xl lg:py-10">
         {view === "pin" && (
           <div className="flex items-center justify-center pt-4">
             <PinPad key={pinKey} onConfirm={handlePin} onCancel={null} loading={loading} error={error} />
@@ -202,48 +203,48 @@ export default function Home() {
         )}
 
         {view === "punch" && employee && (
-          <div className="flex flex-col items-center gap-6 pt-6">
-            <p className="text-2xl font-bold text-gray-800">{employee}</p>
+          <div className="flex flex-col items-center gap-6 pt-6 lg:gap-8 lg:pt-8">
+            <p className="text-2xl font-bold text-gray-800 lg:text-4xl">{employee}</p>
 
             {missingPunches.length > 0 && (
-              <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4">
-                <p className="mb-2 text-sm font-semibold text-amber-800">⚠️ 缺卡紀錄</p>
+              <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4 lg:max-w-md lg:p-5">
+                <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
                 {missingPunches.map((mp, i) => (
                   <button key={i} onClick={() => prefillFromMissing(mp)}
-                    className="mb-1 block w-full rounded-lg bg-amber-100 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200">
+                    className="mb-1 block w-full rounded-lg bg-amber-100 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
                     {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
                     {mp.existing_time && (
-                      <span className="ml-1 text-xs text-amber-700">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
+                      <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
                     )}
-                    <span className="ml-2 text-xs text-amber-600">點擊補登 →</span>
+                    <span className="ml-2 text-xs text-amber-600 lg:text-sm">點擊補登 →</span>
                   </button>
                 ))}
               </div>
             )}
 
-            <div className="w-full max-w-sm">
-              <label className="mb-1 block text-xs text-gray-400">打卡時間（測試用）</label>
+            <div className="w-full max-w-sm lg:max-w-md">
+              <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
               <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 lg:px-4 lg:py-3 lg:text-base" />
             </div>
-            <p className="text-sm text-gray-500">選擇打卡類型</p>
-            <div className="flex w-full max-w-sm flex-col gap-4">
+            <p className="text-sm text-gray-500 lg:text-lg">選擇打卡類型</p>
+            <div className="flex w-full max-w-sm flex-col gap-4 lg:max-w-md lg:gap-5">
               <DirectionButton label="上班" emoji="🟢" suggested={suggested === "in"} onClick={() => handlePunch("in")} />
               <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
             </div>
 
-            <div className="flex w-full max-w-sm gap-3 pt-2">
+            <div className="flex w-full max-w-sm gap-3 pt-2 lg:max-w-md lg:gap-4">
               <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
-                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
+                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98] lg:py-4 lg:text-base">
                 📝 補登打卡
               </button>
               <button onClick={goToOvertime}
-                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98]">
+                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98] lg:py-4 lg:text-base">
                 🕐 加班申請
               </button>
             </div>
 
-            <button onClick={resetToPin} className="text-sm text-gray-400 underline-offset-2 hover:underline">取消</button>
+            <button onClick={resetToPin} className="text-sm text-gray-400 underline-offset-2 hover:underline lg:text-base">取消</button>
           </div>
         )}
 
@@ -379,11 +380,11 @@ export default function Home() {
 function DirectionButton({ label, emoji, suggested, onClick }: { label: string; emoji: string; suggested: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 ${
+      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 lg:gap-5 lg:py-10 lg:text-4xl ${
         suggested ? "bg-stone-800 text-white ring-4 ring-stone-300" : "bg-white text-gray-700"
       }`}>
       <span>{emoji}</span><span>{label}</span>
-      {suggested && <span className="text-xs font-normal opacity-70">（建議）</span>}
+      {suggested && <span className="text-xs font-normal opacity-70 lg:text-sm">（建議）</span>}
     </button>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/device_client";
 
 interface Props {
   employees: string[];
@@ -21,7 +22,7 @@ export default function AmendForm({ employees }: Props) {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch("/api/amend", {
+      const res = await apiFetch("/api/amend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employee, date, in_time: inTime, out_time: outTime, reason }),

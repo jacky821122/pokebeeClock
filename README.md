@@ -104,6 +104,7 @@ Required `.env.local`:
 GOOGLE_SA_JSON={"type":"service_account",...}
 ADMIN_SECRET=...
 SHEET_ID=...
+DEVICE_TOKENS=label1|token1,label2|token2  # optional in dev; required in prod, see docs/device_setup.md
 ```
 
 Run tests and typecheck:
@@ -115,6 +116,7 @@ npm run typecheck
 
 ## Docs
 
+- `docs/device_setup.md` — device token 設定步驟（iPad / 個人手機）
 - `docs/plan.md` — architecture and implementation plan
 - `docs/status.md` — current progress and pending work
 - `docs/hours_analyzer_spec.md` — shift analysis rules

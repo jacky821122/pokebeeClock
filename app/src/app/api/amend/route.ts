@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendAmendment } from "@/lib/sheets";
+import { checkDevice } from "@/lib/device";
 
 function nowTaipei(): string {
   const tw = new Date(Date.now() + 8 * 60 * 60 * 1000);
@@ -8,6 +9,9 @@ function nowTaipei(): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const dev = checkDevice(req);
+    if (!dev.ok) return dev.res;
+
     const body = await req.json();
     const { employee, date, in_time, out_time, reason } = body as {
       employee: string;

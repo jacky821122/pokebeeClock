@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPin, getLastPunchKind, getMissingPunches } from "@/lib/sheets";
+import { checkDevice } from "@/lib/device";
 import { currentYyyyMm } from "@/lib/time";
 import type { PunchKind } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
+    const dev = checkDevice(req);
+    if (!dev.ok) return dev.res;
+
     const { pin } = await req.json() as { pin: string };
     if (!pin) return NextResponse.json({ error: "Missing pin" }, { status: 400 });
 
