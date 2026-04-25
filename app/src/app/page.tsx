@@ -45,6 +45,13 @@ function todayTaipei(): string {
   return nowTaipei().slice(0, 10);
 }
 
+function greetingTaipei(): string {
+  const hour = Number(nowTaipei().slice(11, 13));
+  if (hour < 12) return "早安";
+  if (hour < 15) return "午安";
+  return "晚安";
+}
+
 function toClientTs(local: string): string {
   return local ? `${local}:00+08:00` : nowTaipei();
 }
@@ -205,7 +212,8 @@ export default function Home() {
 
         {view === "punch" && employee && (
           <div className="flex flex-col items-center gap-6 pt-6 lg:gap-8 lg:pt-8">
-            <p className="text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
+            <p className="text-base text-brand-soft/70 lg:text-xl">{greetingTaipei()}</p>
+            <p className="-mt-4 text-2xl font-bold text-brand lg:-mt-6 lg:text-4xl">{employee}</p>
 
             {missingPunches.length > 0 && (
               <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4 lg:max-w-md lg:p-5">
