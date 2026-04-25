@@ -30,36 +30,36 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
   }
 
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex flex-col items-center gap-6 lg:gap-8">
       <div className="text-center">
         {employee ? (
-          <p className="text-lg font-semibold text-gray-800">{employee}</p>
+          <p className="text-lg font-semibold text-gray-800 lg:text-2xl">{employee}</p>
         ) : null}
-        <p className="text-sm text-gray-500">請輸入 PIN</p>
+        <p className="text-sm text-gray-500 lg:text-base">請輸入 PIN</p>
       </div>
 
       {/* dots */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 lg:gap-4">
         {Array.from({ length: PIN_LENGTH }).map((_, i) => (
           <div
             key={i}
-            className={`h-4 w-4 rounded-full border-2 transition-colors ${
+            className={`h-4 w-4 rounded-full border-2 transition-colors lg:h-5 lg:w-5 ${
               i < pin.length ? "border-stone-700 bg-stone-700" : "border-stone-300"
             }`}
           />
         ))}
       </div>
 
-      {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+      {error && <p className="text-sm font-medium text-red-500 lg:text-base">{error}</p>}
 
       {/* keypad */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3 lg:gap-5">
         {KEYS.map((key, idx) => (
           <button
             key={idx}
             disabled={key === "" || loading}
             onClick={() => key && press(key)}
-            className={`flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-semibold transition-all ${
+            className={`flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-semibold transition-all lg:h-24 lg:w-24 lg:text-3xl ${
               key === ""
                 ? "invisible"
                 : "bg-white shadow-sm active:scale-95 active:bg-stone-100 disabled:opacity-50"
