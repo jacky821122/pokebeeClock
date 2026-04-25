@@ -52,13 +52,6 @@ function greetingTaipei(): string {
   return "晚安";
 }
 
-function greetingPreviewText(): string {
-  if (process.env.NODE_ENV !== "production") {
-    return "早安 / 午安 / 晚安";
-  }
-  return greetingTaipei();
-}
-
 function toClientTs(local: string): string {
   return local ? `${local}:00+08:00` : nowTaipei();
 }
@@ -219,7 +212,7 @@ export default function Home() {
 
         {view === "punch" && employee && (
           <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-6 lg:gap-8 lg:px-8 lg:pt-8">
-            <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingPreviewText()}，今天也辛苦了 ✨</p>
+            <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
             {missingPunches.length > 0 && (
