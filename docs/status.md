@@ -8,6 +8,19 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
+0. **「老闆的話」功能（成功打卡後顯示）** —
+    * 老闆 ↔ 員工的小溝通介面：成功打卡時抽一條老闆訊息顯示在 ✅ 下方，員工可在自動跳回前點固定 emoji 回應（❤️🙏🤔），不延長 timer。
+    * Sheet 設計（避免 id 對照麻煩，直接存文字）：
+      - 新 tab `messages`：`text | active | weight | created_at`（沒有 id）
+      - 新 tab `message_responses`：`employee | message_text | response | timestamp`（直接存原訊息文字，方便事後閱讀，不必回 messages 對照）
+    * 隨機策略：每次打卡獨立加權隨機；不做「同日同人不重複」。
+    * Fallback：訊息表空時顯示固定兜底文案（例如「今天也辛苦了 🐝」）。
+    * v1 不做 admin 訊息管理 UI，老闆直接編 Sheet。等麻煩到再做。
+    * 不開放員工打字回應（iPad 打字慢、又要審核機制，太重）。
+    * 拆獨立 branch 做（功能改動跟視覺改動分開 review）。
+1. **視覺收尾**（feat/visual-refresh 尚未 merge）—
+    * 此 branch 暫時開了 `NEXT_PUBLIC_BYPASS_AUTH=1` 跳過 admin/setup/device 驗證以利 preview，**merge 前必須移除**所有 `// BYPASS` 標記的程式碼（lib/device.ts、3 個 admin route、admin/page.tsx）。
+
 6. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
 7. **展示層報表實機驗證** — 用真實資料跑 `scripts/generate_report.ts`，比對舊版 V1 output 差異。

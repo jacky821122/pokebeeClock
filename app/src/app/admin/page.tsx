@@ -25,6 +25,11 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    // BYPASS: feat/visual-refresh preview convenience. Remove before merging.
+    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") {
+      setSecret("preview");
+      return;
+    }
     const cached = sessionStorage.getItem(SECRET_KEY);
     if (cached) setSecret(cached);
   }, []);
@@ -193,7 +198,7 @@ function ReanalyzeAll({ secret }: { secret: string }) {
         <button
           onClick={run}
           disabled={loading}
-          className="rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-40"
+          className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-40"
         >
           {loading ? "重算中…" : "重算全部員工"}
         </button>

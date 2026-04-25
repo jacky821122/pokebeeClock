@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { listAllEmployees, addEmployee, updateEmployee } from "@/lib/sheets";
 
 function checkAuth(req: NextRequest): boolean {
+  // BYPASS: feat/visual-refresh preview convenience. Remove before merging.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return true;
   const expected = process.env.ADMIN_SECRET;
   if (!expected) return false;
   const header = req.headers.get("authorization") ?? "";
