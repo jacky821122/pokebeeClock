@@ -91,7 +91,7 @@ function handleFullTime(
 
     // Flag if raw punch diff > 10hr 15min (use original timestamps, not normalized)
     const rawDiffHours = (outTs!.getTime() - inTs!.getTime()) / 3600 / 1000;
-    if (rawDiffHours > 10.25) {
+    if (rawDiffHours >= 10.25) {
       notes.push(`上班時間 ${fmtHours(rawDiffHours)} 小時（超過 10 小時 15 分），請確認是否需申請加班`);
     }
   }
@@ -228,7 +228,7 @@ export function applyDailyCapForPt(
     // Sum actual worked hours (before any cap) for flag check
     const actualTotal = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);
 
-    if (actualTotal > 8.25) {
+    if (actualTotal >= 8.25) {
       summary.overtime_specials.push(
         `${date} 日實際總時數 ${fmtHours(actualTotal)} 小時（超過 8 小時 15 分），請確認是否需申請加班`,
       );
