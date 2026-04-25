@@ -52,6 +52,13 @@ function greetingTaipei(): string {
   return "晚安";
 }
 
+function greetingPreviewText(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return "早安 / 午安 / 晚安";
+  }
+  return greetingTaipei();
+}
+
 function toClientTs(local: string): string {
   return local ? `${local}:00+08:00` : nowTaipei();
 }
@@ -198,9 +205,8 @@ export default function Home() {
   return (
     <div className="app-bg min-h-dvh">
       <div className="bg-brand/95 px-4 py-4 flex items-center gap-3 shadow-sm">
-        <button onClick={handleBeeClick} aria-label="logo" className="text-2xl select-none transition-transform hover:scale-110 focus:outline-none active:scale-95">🐝</button>
+        <button onClick={handleBeeClick} aria-label="logo" className="text-2xl select-none focus:outline-none">🐝</button>
         <h1 className="text-lg font-bold text-brand-cream tracking-wide">pokebee 打卡</h1>
-        <span className="hidden rounded-full bg-brand-honey/20 px-2 py-1 text-[10px] font-semibold text-brand-cream sm:inline">HIVE MODE</span>
         <span className="ml-auto text-xs text-brand-cream/40">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
       </div>
 
@@ -213,7 +219,7 @@ export default function Home() {
 
         {view === "punch" && employee && (
           <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-6 lg:gap-8 lg:px-8 lg:pt-8">
-            <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
+            <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingPreviewText()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
             {missingPunches.length > 0 && (
@@ -221,7 +227,7 @@ export default function Home() {
                 <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
                 {missingPunches.map((mp, i) => (
                   <button key={i} onClick={() => prefillFromMissing(mp)}
-                    className="mb-1 block w-full rounded-xl bg-amber-100/90 px-3 py-2 text-left text-sm text-amber-900 transition-all hover:-translate-y-0.5 hover:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
+                    className="mb-1 block w-full rounded-xl bg-amber-100/90 px-3 py-2 text-left text-sm text-amber-900 transition-all active:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
                     {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
                     {mp.existing_time && (
                       <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
@@ -247,16 +253,16 @@ export default function Home() {
 
             <div className="flex w-full max-w-sm gap-3 pt-2 lg:max-w-md lg:gap-4">
               <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
-                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-sand active:scale-[0.98] lg:py-4 lg:text-base">
+                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 📝 補登打卡
               </button>
               <button onClick={goToOvertime}
-                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all hover:-translate-y-0.5 hover:bg-brand-sand active:scale-[0.98] lg:py-4 lg:text-base">
+                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 🕐 加班申請
               </button>
             </div>
 
-            <button onClick={resetToPin} className="text-sm text-brand-soft/60 underline-offset-2 hover:underline lg:text-base">取消</button>
+            <button onClick={resetToPin} className="text-sm text-brand-soft/60 underline-offset-2 lg:text-base">取消</button>
           </div>
         )}
 
@@ -294,11 +300,11 @@ export default function Home() {
                   className="input-soft w-full" />
               </Field>
               <button onClick={handleSupplement} disabled={loading}
-                className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-md transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50">
+                className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-md transition-all active:scale-95 disabled:opacity-50">
                 {loading ? "送出中…" : "送出補登"}
               </button>
             </div>
-            <button onClick={() => { setError(null); setSupContext(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2 hover:underline">返回</button>
+            <button onClick={() => { setError(null); setSupContext(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2">返回</button>
           </div>
         )}
 
@@ -334,7 +340,7 @@ export default function Home() {
                 ) : null;
               })()}
               <button onClick={handleOvertime} disabled={loading}
-                className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-md transition-all hover:-translate-y-0.5 active:scale-95 disabled:opacity-50">
+                className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-md transition-all active:scale-95 disabled:opacity-50">
                 {loading ? "送出中…" : "送出申請"}
               </button>
             </div>
@@ -361,7 +367,7 @@ export default function Home() {
                         </div>
                         {canRevoke ? (
                           <button onClick={() => revokeOt(r.submitted_at)} disabled={loading}
-                            className="ml-2 shrink-0 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-40">
+                            className="ml-2 shrink-0 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors active:bg-red-100 disabled:opacity-40">
                             撤回
                           </button>
                         ) : (
@@ -374,14 +380,14 @@ export default function Home() {
               )}
             </div>
 
-            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2 hover:underline">返回</button>
+            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2">返回</button>
           </div>
         )}
 
         {view === "success" && (
           <div className="glass-panel mx-auto flex max-w-sm flex-col items-center justify-center gap-4 rounded-[1.75rem] px-6 py-10 text-center">
             <Image src="/icon-512.png" alt="" width={120} height={120} className="rounded-3xl shadow-md ring-4 ring-brand-honey/25" />
-            <div className="animate-pulse text-5xl">✅</div>
+            <div className="text-5xl">✅</div>
             <p className="text-xl font-bold text-brand">{successMsg}</p>
           </div>
         )}
@@ -393,7 +399,7 @@ export default function Home() {
 function DirectionButton({ label, emoji, suggested, onClick }: { label: string; emoji: string; suggested: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`flex items-center justify-center gap-3 rounded-3xl py-6 text-2xl font-bold shadow-md transition-all hover:-translate-y-0.5 active:scale-95 lg:gap-5 lg:py-10 lg:text-4xl ${
+      className={`flex items-center justify-center gap-3 rounded-3xl py-6 text-2xl font-bold shadow-md transition-all active:scale-95 lg:gap-5 lg:py-10 lg:text-4xl ${
         suggested
           ? "bg-brand text-brand-cream ring-4 ring-brand-accent/40"
           : "border border-brand-honey/20 bg-white/95 text-brand-soft"
@@ -412,7 +418,7 @@ function ToggleBtn({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button onClick={onClick}
       className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all active:scale-95 ${
-        active ? "bg-brand text-brand-cream shadow-sm" : "bg-brand-sand/85 text-brand-soft/70 hover:bg-brand-sand"
+        active ? "bg-brand text-brand-cream shadow-sm" : "bg-brand-sand/85 text-brand-soft/70 active:bg-brand-sand"
       }`}>
       {children}
     </button>

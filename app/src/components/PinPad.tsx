@@ -62,7 +62,7 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
             className={`flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-semibold text-brand transition-all lg:h-24 lg:w-24 lg:text-3xl ${
               key === ""
                 ? "invisible"
-                : "border border-brand-honey/20 bg-white/95 shadow-sm hover:-translate-y-0.5 hover:bg-brand-sand active:scale-95 disabled:opacity-50"
+                : "border border-brand-honey/20 bg-white/95 shadow-sm active:scale-95 active:bg-brand-sand disabled:opacity-50"
             }`}
           >
             {key}
@@ -74,7 +74,7 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
         <button
           onClick={onCancel}
           disabled={loading}
-          className="text-sm text-brand-soft/60 underline-offset-2 hover:underline"
+          className="text-sm text-brand-soft/60 underline-offset-2"
         >
           取消
         </button>

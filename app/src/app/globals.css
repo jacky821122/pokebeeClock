@@ -7,13 +7,16 @@
   --color-brand-sand: #f5ebdc;
   --color-brand-accent: #a8763e;
   --color-brand-honey: #f6cf7a;
-  --color-brand-mint: #d9f3e8;
-  --color-brand-danger: #ff6f61;
 }
 
 @layer base {
   html {
     overflow-x: hidden;
+  }
+
+  button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   /* iOS Safari: hide native date/time picker icons that cause overflow */
