@@ -6,6 +6,9 @@
   --color-brand-cream: #fdf8f3;
   --color-brand-sand: #f5ebdc;
   --color-brand-accent: #a8763e;
+  --color-brand-honey: #f6cf7a;
+  --color-brand-mint: #d9f3e8;
+  --color-brand-danger: #ff6f61;
 }
 
 @layer base {
@@ -36,5 +39,37 @@
     appearance: none;
     max-width: 100%;
     box-sizing: border-box;
+  }
+}
+
+@layer components {
+  .app-bg {
+    background:
+      radial-gradient(circle at 12% 18%, rgb(246 207 122 / 0.2), transparent 26%),
+      radial-gradient(circle at 85% 8%, rgb(216 244 232 / 0.35), transparent 28%),
+      linear-gradient(180deg, #fffdf9 0%, #fdf8f3 50%, #fbf2e5 100%);
+  }
+
+  .glass-panel {
+    border: 1px solid rgb(255 255 255 / 0.8);
+    background: rgb(255 255 255 / 0.72);
+    box-shadow: 0 10px 30px rgb(90 58 40 / 0.12);
+    backdrop-filter: blur(8px);
+  }
+
+  .input-soft {
+    border-radius: 0.9rem;
+    border: 1px solid rgb(245 235 220);
+    background: rgb(255 255 255 / 0.9);
+    padding: 0.65rem 0.85rem;
+    font-size: 0.95rem;
+    color: rgb(74 45 31);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .input-soft:focus {
+    outline: none;
+    border-color: rgb(168 118 62 / 0.75);
+    box-shadow: 0 0 0 4px rgb(246 207 122 / 0.25);
   }
 }

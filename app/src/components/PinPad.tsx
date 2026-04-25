@@ -30,7 +30,7 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 lg:gap-8">
+    <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-6 py-7 lg:gap-8 lg:px-10 lg:py-10">
       <div className="text-center">
         {employee ? (
           <p className="text-lg font-semibold text-brand lg:text-2xl">{employee}</p>
@@ -62,7 +62,7 @@ export default function PinPad({ employee, onConfirm, onCancel, loading, error }
             className={`flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-semibold text-brand transition-all lg:h-24 lg:w-24 lg:text-3xl ${
               key === ""
                 ? "invisible"
-                : "bg-white shadow-sm active:scale-95 active:bg-brand-sand disabled:opacity-50"
+                : "border border-brand-honey/20 bg-white/95 shadow-sm hover:-translate-y-0.5 hover:bg-brand-sand active:scale-95 disabled:opacity-50"
             }`}
           >
             {key}
