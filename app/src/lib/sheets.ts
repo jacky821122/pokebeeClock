@@ -8,10 +8,14 @@ const TAB_EMPLOYEES = "employees";
 const TAB_PUNCHES = "raw_punches";
 const TAB_OVERTIME = "overtime_requests";
 const TAB_DEVICES = "devices";
+const TAB_MESSAGES = "messages";
+const TAB_MESSAGE_RESPONSES = "message_responses";
 
-// employees:   name | pin | role | active
-// raw_punches: employee | client_ts | server_ts | source | kind | device
-// devices:     label | token | active
+// employees:          name | pin | role | active
+// raw_punches:        employee | client_ts | server_ts | source | kind | device
+// devices:            label | token | active
+// messages:           text | active | weight | created_at
+// message_responses:  employee | message_text | response | timestamp
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
@@ -575,6 +579,58 @@ export async function getRecentOvertimeRequests(employee: string, limit = 10): P
 /**
  * Delete an overtime request by clearing the row (matching submitted_at + employee).
  */
+// ── messages ─────────────────────────────────────────────────────────────────
+
+export interface Message {
+  text: string;
+  weight: number;
+}
+
+/**
+ * Read active boss messages. Returns [] if tab is missing or empty so callers
+ * can fall back to a static greeting.
+ */
+export async function getActiveMessages(): Promise<Message[]> {
+  const sheets = getSheets();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${TAB_MESSAGES}!A:D`,
+    });
+    const rows = res.data.values ?? [];
+    return rows
+      .slice(1)
+      .filter((r) => r[0] && r[1]?.toString().toUpperCase() === "TRUE")
+      .map((r) => ({
+        text: String(r[0]),
+        weight: Number(r[2] ?? 1) || 1,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export interface MessageResponseInput {
+  employee: string;
+  message_text: string;
+  response: string;
+  timestamp: string;
+}
+
+export async function appendMessageResponse(input: MessageResponseInput): Promise<void> {
+  const sheets = getSheets();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: sid(),
+    range: `${TAB_MESSAGE_RESPONSES}!A:D`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[input.employee, input.message_text, input.response, input.timestamp]],
+    },
+  });
+}
+
+// ── overtime delete ──────────────────────────────────────────────────────────
+
 export async function deleteOvertimeRequest(submittedAt: string, employee: string): Promise<boolean> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({

@@ -83,6 +83,9 @@ export default function Home() {
   const [otRecords, setOtRecords] = useState<OtRecord[]>([]);
   const [otLoading, setOtLoading] = useState(false);
 
+  const [bossMessage, setBossMessage] = useState<string | null>(null);
+  const [bossResponded, setBossResponded] = useState<string | null>(null);
+
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
@@ -114,6 +117,25 @@ export default function Home() {
     setSuccessMsg(msg); setView("success"); setTimeout(resetToPin, delayMs);
   }
 
+  async function fetchBossMessage() {
+    setBossMessage(null); setBossResponded(null);
+    try {
+      const res = await apiFetch("/api/message");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.text) setBossMessage(data.text);
+    } catch { /* ignore — fallback handled by render */ }
+  }
+
+  function respondToBoss(emoji: string) {
+    if (!employee || !bossMessage || bossResponded) return;
+    setBossResponded(emoji);
+    apiFetch("/api/message", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employee, message_text: bossMessage, response: emoji }),
+    }).catch(() => {});
+  }
+
   /** Brief success flash, then return to punch view (stay logged in) */
   function showSuccessAndReturn(msg: string) {
     setSuccessMsg(msg); setView("success");
@@ -123,6 +145,7 @@ export default function Home() {
   function handlePunch(k: PunchKind) {
     if (!employee) return;
     showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`);
+    fetchBossMessage();
     apiFetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts: toClientTs(customTs), kind: k }),
     }).catch(() => {});
@@ -382,9 +405,50 @@ export default function Home() {
             <Image src="/icon-512.png" alt="" width={120} height={120} className="rounded-3xl shadow-md ring-4 ring-brand-honey/25" />
             <div className="text-5xl">✅</div>
             <p className="text-xl font-bold text-brand">{successMsg}</p>
+
+            {bossMessage ? (
+              <BossMessageCard text={bossMessage} responded={bossResponded} onRespond={respondToBoss} />
+            ) : (
+              /* Fallback when messages tab is empty / fetch failed: subtle static line */
+              <p className="mt-2 text-sm text-brand-soft/60">今天也辛苦了 🐝</p>
+            )}
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+const BOSS_RESPONSES = ["❤️", "🙏", "🤔"] as const;
+
+function BossMessageCard({ text, responded, onRespond }: { text: string; responded: string | null; onRespond: (emoji: string) => void }) {
+  return (
+    <div className="mt-3 w-full rounded-2xl border border-brand-honey/40 bg-brand-honey/15 px-4 py-3 text-left">
+      <p className="text-xs font-semibold tracking-wide text-brand-soft/80">老闆的話</p>
+      <p className="mt-1 text-sm text-brand">{text}</p>
+      <div className="mt-2 flex justify-end gap-2">
+        {BOSS_RESPONSES.map((emoji) => {
+          const picked = responded === emoji;
+          const otherPicked = responded !== null && !picked;
+          return (
+            <button
+              key={emoji}
+              onClick={() => onRespond(emoji)}
+              disabled={responded !== null}
+              className={`rounded-full px-3 py-1 text-lg transition-all active:scale-90 ${
+                picked
+                  ? "bg-brand text-brand-cream ring-2 ring-brand-honey"
+                  : otherPicked
+                    ? "bg-white/40 opacity-40"
+                    : "bg-white/90 shadow-sm"
+              }`}
+            >
+              {emoji}
+            </button>
+          );
+        })}
+      </div>
+      {responded && <p className="mt-1 text-right text-xs text-brand-soft/60">已收到回應</p>}
     </div>
   );
 }
