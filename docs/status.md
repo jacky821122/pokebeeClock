@@ -56,13 +56,10 @@ V2 analyzer 規則：
 加班申請流程：
 UI → 輸入起迄時間 → /api/overtime → 系統算時數(15min單位) → 寫入 overtime_requests → 月結報表直接加計
 
-補登流程（舊，保留）：
-/amend → /api/amend → appendAmendment() [status=pending, 不觸發重算]
-
 展示層生成（月底 on-demand）：
 scripts/generate_report.ts <YYYY-MM>
   → generateReport() [src/lib/report_generator.ts]
-  → getAllPunchesForMonth() + getActiveEmployees() + getAmendmentsForMonth() + getOvertimeRequestsForMonth()
+  → getAllPunchesForMonth() + getActiveEmployees() + getOvertimeRequestsForMonth()
   → analyzeEmployee() per employee + 加計 overtime_requests
   → exceljs → data/reports/clock_report_<YYYY-MM>.xlsx
 ```
@@ -73,6 +70,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-26 — 移除 amendments（補登申請）功能：`/amend` 頁、`/api/amend`、`AmendForm`、Sheet `amendments` tab 全數刪除；report_generator 移除 amendments 區塊
 - 2026-04-25 — Device token 來源從 env 改為 Sheet `devices` tab：管理權統一在 Sheet edit access、撤銷免 redeploy、無 cache 即時生效
 - 2026-04-25 — iPad 橫屏 (lg:) 放大 PinPad、打卡主畫面字級與按鈕
 - 2026-04-25 — Device token 驗證：env `DEVICE_TOKENS=label|token,...`、`/setup` 頁面、`apiFetch` 自動帶 header 並在 401 跳 /setup、`raw_punches` 加 device 欄
@@ -117,7 +115,6 @@ scripts/generate_report.ts <YYYY-MM>
 - `/api/employees`：讀 `employees` tab
 - `/api/punch`：PIN 驗證 → 寫 `raw_punches` → 重算 `analyzed_*`
 - `analyzer_bridge.ts`：punches → Events → analyzeEmployee → 寫回 sheet
-- 補登頁 `/amend` + `/api/amend`（寫 `amendments`，status=pending）
 
 ### 已驗證
 - 打卡後 `raw_punches` 正確寫入

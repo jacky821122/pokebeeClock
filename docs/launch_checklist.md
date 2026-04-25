@@ -30,7 +30,7 @@
 
 ## E. 資料清理（上線前）
 
-- [ ] **E13. 清空所有測試資料**：`raw_punches`、`analyzed_*`、`amendments`、`overtime_requests` 全部清掉（保留 header）。
+- [ ] **E13. 清空所有測試資料**：`raw_punches`、`analyzed_*`、`overtime_requests` 全部清掉（保留 header）。
 - [ ] **E14. `employees` tab 檢查**：移除任何測試員工、確認每位 PIN 是正式的（不是 1234 之類）、`role` 與 `active` 正確。
 - [ ] **E15. 沒測過的 status.md 項目**：跨月邊界（#9）、PWA 實機（#6）、實資料報表（#7）。
 
@@ -44,7 +44,7 @@
 ## G. 維運 / 流程
 
 - [ ] **G20. 第一次月結 dry-run**：實際走一次月底流程（重算 → 下載報表 → 對照），看數字 / 缺卡 / 加班是否合理。
-- [ ] **G21. 管理者 SOP 文件**：新增員工、改 PIN、補登審核（amendments status=pending 目前沒 UI 處理）、下載報表、撞 quota 怎麼辦。
+- [ ] **G21. 管理者 SOP 文件**：新增員工、改 PIN、下載報表、撞 quota 怎麼辦。
 - [ ] **G22. 員工教學**：1 張紙說明打卡、補登、加班三個流程。
 - [ ] **G23. 回滾計畫**：如果第一週系統有問題，能不能回去用 iCHEF + LINE。把 iCHEF 帳號保留別停用。
 

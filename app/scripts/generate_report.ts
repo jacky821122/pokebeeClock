@@ -2,8 +2,8 @@
  * generate_report.ts
  *
  * On-demand display-layer xlsx report. Reads raw_punches + employees +
- * amendments from Sheets, runs the analyzer, and writes a human-readable
- * xlsx to `data/reports/clock_report_<YYYY-MM>.xlsx`.
+ * overtime_requests from Sheets, runs the analyzer, and writes a
+ * human-readable xlsx to `data/reports/clock_report_<YYYY-MM>.xlsx`.
  *
  * Usage:
  *   npx tsx scripts/generate_report.ts <YYYY-MM>

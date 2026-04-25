@@ -6,13 +6,11 @@ const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 
 const TAB_EMPLOYEES = "employees";
 const TAB_PUNCHES = "raw_punches";
-const TAB_AMENDMENTS = "amendments";
 const TAB_OVERTIME = "overtime_requests";
 const TAB_DEVICES = "devices";
 
 // employees:   name | pin | role | active
 // raw_punches: employee | client_ts | server_ts | source | kind | device
-// amendments:  submitted_at | employee | date | in_time | out_time | reason
 // devices:     label | token | active
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
@@ -265,58 +263,6 @@ export async function getLastPunchKind(employee: string): Promise<"in" | "out" |
     latestKind = kind;
   }
   return latestKind;
-}
-
-// ── amendments ───────────────────────────────────────────────────────────────
-
-export interface AmendmentInput {
-  submitted_at: string;
-  employee: string;
-  date: string;
-  in_time: string;
-  out_time: string;
-  reason: string;
-}
-
-export async function appendAmendment(a: AmendmentInput): Promise<void> {
-  const sheets = getSheets();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sid(),
-    range: `${TAB_AMENDMENTS}!A:F`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[a.submitted_at, a.employee, a.date, a.in_time, a.out_time, a.reason]],
-    },
-  });
-}
-
-export interface AmendmentRecord {
-  submitted_at: string;
-  employee: string;
-  date: string;
-  in_time: string;
-  out_time: string;
-  reason: string;
-}
-
-export async function getAmendmentsForMonth(yyyyMm: string): Promise<AmendmentRecord[]> {
-  const sheets = getSheets();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sid(),
-    range: `${TAB_AMENDMENTS}!A:F`,
-  });
-  const rows = res.data.values ?? [];
-  return rows
-    .slice(1)
-    .filter((r) => (r[2] ?? "").startsWith(yyyyMm))
-    .map((r) => ({
-      submitted_at: r[0] ?? "",
-      employee: r[1] ?? "",
-      date: r[2] ?? "",
-      in_time: r[3] ?? "",
-      out_time: r[4] ?? "",
-      reason: r[5] ?? "",
-    }));
 }
 
 export async function getActiveEmployeesSortedByLastPunch(): Promise<string[]> {

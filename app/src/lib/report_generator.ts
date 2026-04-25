@@ -3,7 +3,7 @@
  *
  * Produces a human-readable xlsx matching the Python `write_xlsx_report`
  * layout (pokebee/clock_in_out_analyzer.py). Two sheets:
- *   - 摘要: per-employee block (正常時數 / 加班時數 / 特殊班別 / 補班申請)
+ *   - 摘要: per-employee block (正常時數 / 加班時數 / 特殊班別 / 加班申請)
  *   - 明細: flat table of PairRecords
  *
  * Pure function — returns a Buffer. The caller decides where it goes
@@ -12,35 +12,25 @@
 
 import ExcelJS from "exceljs";
 import { analyzeEmployee, fmtHours, type EmployeeSummary, type PairRecord } from "@/lib/analyzer";
-import { getActiveEmployees, getAllPunchesForMonth, getAmendmentsForMonth, getOvertimeRequestsForMonth, type AmendmentRecord, type OvertimeRecord } from "@/lib/sheets";
+import { getActiveEmployees, getAllPunchesForMonth, getOvertimeRequestsForMonth, type OvertimeRecord } from "@/lib/sheets";
 import { punchesToEvents } from "@/lib/analyzer_bridge";
 
 interface EmployeeResult {
   summary: EmployeeSummary;
   records: PairRecord[];
-  amendments: AmendmentRecord[];
   overtimeRequests: OvertimeRecord[];
 }
 
 export async function generateReport(yyyyMm: string, log?: (label: string) => void): Promise<Buffer> {
   log?.("start Sheets reads");
-  const [employees, punchesByEmp, allAmendments, allOvertimeRequests] = await Promise.all([
+  const [employees, punchesByEmp, allOvertimeRequests] = await Promise.all([
     getActiveEmployees(),
     getAllPunchesForMonth(yyyyMm),
-    getAmendmentsForMonth(yyyyMm),
     getOvertimeRequestsForMonth(yyyyMm),
   ]);
   log?.("Sheets reads done");
 
   const fullTimeSet = new Set(employees.filter((e) => e.role === "full_time").map((e) => e.name));
-
-  // Amendments → by employee (sorted by date)
-  const amendByEmp = new Map<string, AmendmentRecord[]>();
-  for (const a of allAmendments) {
-    if (!amendByEmp.has(a.employee)) amendByEmp.set(a.employee, []);
-    amendByEmp.get(a.employee)!.push(a);
-  }
-  for (const arr of amendByEmp.values()) arr.sort((a, b) => a.date.localeCompare(b.date));
 
   // Overtime requests → by employee (sorted by date)
   const otByEmp = new Map<string, OvertimeRecord[]>();
@@ -62,28 +52,11 @@ export async function generateReport(yyyyMm: string, log?: (label: string) => vo
     if (summary.normal_hours === 0 && summary.overtime_hours === 0 && summary.specials.length === 0) {
       continue;
     }
-    results.push({ summary, records, amendments: amendByEmp.get(name) ?? [], overtimeRequests: empOt });
+    results.push({ summary, records, overtimeRequests: empOt });
     seenEmployees.add(name);
   }
 
-  // Employees who submitted amendments but have no punches → still appear in report
-  for (const [name, amendments] of amendByEmp) {
-    if (seenEmployees.has(name)) continue;
-    const empOt = otByEmp.get(name) ?? [];
-    const otMinutes = empOt.reduce((sum, o) => sum + o.minutes, 0);
-    const summary: EmployeeSummary = {
-      employee: name,
-      is_full_time: fullTimeSet.has(name),
-      normal_hours: 0,
-      overtime_hours: otMinutes / 60,
-      specials: [],
-      overtime_specials: [],
-    };
-    results.push({ summary, records: [], amendments, overtimeRequests: empOt });
-    seenEmployees.add(name);
-  }
-
-  // Employees with only overtime requests (no punches, no amendments)
+  // Employees with only overtime requests (no punches)
   for (const [name, ots] of otByEmp) {
     if (seenEmployees.has(name)) continue;
     const otMinutes = ots.reduce((sum, o) => sum + o.minutes, 0);
@@ -95,7 +68,7 @@ export async function generateReport(yyyyMm: string, log?: (label: string) => vo
       specials: [],
       overtime_specials: [],
     };
-    results.push({ summary, records: [], amendments: [], overtimeRequests: ots });
+    results.push({ summary, records: [], overtimeRequests: ots });
   }
 
   results.sort((a, b) => a.summary.employee.localeCompare(b.summary.employee));
@@ -111,7 +84,7 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
 
   // ── 摘要 ────────────────────────────────────────────────────────────────
   const wsSummary = wb.addWorksheet("摘要");
-  for (const { summary, amendments, overtimeRequests } of results) {
+  for (const { summary, overtimeRequests } of results) {
     const role = summary.is_full_time ? "正職" : "計時";
     const nameRow = wsSummary.addRow([`${summary.employee}（${role}）`]);
     nameRow.font = { bold: true };
@@ -128,14 +101,6 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
     if (summary.overtime_specials.length > 0) {
       wsSummary.addRow(["加班:"]);
       for (const line of summary.overtime_specials) wsSummary.addRow([`  ${line}`]);
-    }
-
-    if (amendments.length > 0) {
-      wsSummary.addRow(["補班申請:"]);
-      for (const a of amendments) {
-        const range = a.in_time && a.out_time ? `${a.in_time}-${a.out_time}` : (a.in_time || a.out_time || "");
-        wsSummary.addRow([`  ${a.date} ${range} 原因：${a.reason}`]);
-      }
     }
 
     wsSummary.addRow(["加班申請:"]);

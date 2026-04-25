@@ -22,7 +22,6 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 - **Shift windows**: 早班 9:00-15:00, 晚班 15:00-21:00 (normal ±1hr buffer). If hourly employee's `normIn < 14:00` and `normOut >= 15:00`, it is treated as two missing punches (早班缺out + 晚班缺in), not a single long shift.
 - **Overtime flag**: uses **actual worked hours** (before cap) to check > 8hr 15min (hourly) / > 10hr 15min (full-time). Per-shift cap and daily cap are applied after the flag check.
 - **Normalize**: unified `roundToHalfHour` for both in and out. No grace period, no directional bias.
-- **Amendments do not auto-trigger recalculation.** They land in `amendments` with `status=pending`; the manager reviews at month-end. Do not wire them into the punch-triggered recalc.
 - **Python parity is no longer a goal.** V2 intentionally diverges from the Python analyzer. The parity test has been replaced with V2-specific tests.
 
 ## Time zone

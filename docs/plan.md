@@ -34,8 +34,7 @@ xlsx 報表（展示層，不持久化）
 ```
 
 - `raw_punches` 是唯一事實來源，analyzed 可從它完整重建
-- 月度摘要不持久化，報表需要時即時從 raw_punches + amendments 重算
-- 補登（amendments）status=pending，不自動觸發重算；月底人工審核
+- 月度摘要不持久化，報表需要時即時從 raw_punches + overtime_requests 重算
 
 ## 安全原則
 

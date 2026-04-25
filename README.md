@@ -1,6 +1,6 @@
 # pokebeeClock
 
-iPad PWA for employee clock-in/out and amendment requests. Replaces iCHEF CSV export + LINE notepad workflow.
+iPad PWA for employee clock-in/out. Replaces iCHEF CSV export + LINE notepad workflow.
 
 ## Features
 
@@ -8,7 +8,6 @@ iPad PWA for employee clock-in/out and amendment requests. Replaces iCHEF CSV ex
 - Supplement punch for missing records (補登打卡)
 - Overtime request with 24hr cancel window (加班申請)
 - Missing punch detection with suggested times (缺卡提示)
-- Amendment submission form (補登, legacy)
 - Automatic shift analysis on every punch (TypeScript port of Python analyzer)
 - Admin panel: employee management, bulk reanalyze, report download
 - On-demand xlsx report for payroll review (摘要 + 明細 + 加班申請)
@@ -35,7 +34,6 @@ When the reviewer has questions, they drill down from the xlsx into the data lay
 |---|---|
 | `employees` | `name`, `pin_hash`, `role` (full_time/hourly), `active` |
 | `raw_punches` | `id`, `employee`, `client_ts`, `server_ts`, `source`, `kind` (`in`/`out`) |
-| `amendments` | `id`, `submitted_at`, `employee`, `date`, `shift`, `in_time`, `out_time`, `reason`, `status` |
 | `overtime_requests` | `id`, `employee`, `date`, `start_time`, `end_time`, `hours`, `reason`, `status`, `submitted_at` |
 | `analyzed_YYYY-MM` | `employee`, `date`, `shift`, `in_raw`, `in_norm`, `out_raw`, `out_norm`, `normal_hours`, `overtime_hours`, `note` |
 
@@ -63,22 +61,16 @@ UI: enter PIN → `/api/identify` returns employee + suggested direction + missi
 
 `punchesToEvents` turns the flat punch list into analyzer `Event`s, inserting synthetic `no-clock-out` events whenever two consecutive `in`s appear (the earlier one was forgotten) or the month ends on an `in`. Legacy rows without an explicit `kind` fall back to alternating order.
 
-### Amendment flow
-
-`/api/amend → appendAmendment` (status=pending; does not trigger recalc — reviewed manually at month-end).
-
 ### Overtime flow
 
 `/api/overtime {employee, date, start_time, end_time, reason}` → calculates hours in 15min units → appends to `overtime_requests` tab. Employees can cancel within 24hr. Report generator reads `overtime_requests` and adds overtime hours to the summary.
 
 ### Display-layer report
 
-Core: `src/lib/report_generator.ts` — pure function, returns an xlsx `Buffer`. Reads `raw_punches` + `employees` + `amendments` for the month and runs the analyzer to build the workbook. Layout mirrors `pokebee/clock_in_out_analyzer.py:write_xlsx_report`:
+Core: `src/lib/report_generator.ts` — pure function, returns an xlsx `Buffer`. Reads `raw_punches` + `employees` + `overtime_requests` for the month and runs the analyzer to build the workbook. Layout mirrors `pokebee/clock_in_out_analyzer.py:write_xlsx_report`:
 
-- **摘要** sheet: per-employee block with `正常時數`, `加班時數`, `特殊班別`, `補班申請`.
+- **摘要** sheet: per-employee block with `正常時數`, `加班時數`, `特殊班別`, `加班申請`.
 - **明細** sheet: flat `PairRecord` table.
-
-Amendments are listed regardless of status (status is kept in the data layer for future drill-down but not shown in the report).
 
 CLI trigger:
 
