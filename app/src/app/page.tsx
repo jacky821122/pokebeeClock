@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import PinPad from "@/components/PinPad";
 import { apiFetch } from "@/lib/device_client";
@@ -42,6 +43,13 @@ function nowTaipeiLocal(): string {
 
 function todayTaipei(): string {
   return nowTaipei().slice(0, 10);
+}
+
+function greetingTaipei(): string {
+  const hour = Number(nowTaipei().slice(11, 13));
+  if (hour < 12) return "早安";
+  if (hour < 15) return "午安";
+  return "晚安";
 }
 
 function toClientTs(local: string): string {
@@ -188,11 +196,11 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-dvh bg-stone-50">
-      <div className="bg-stone-800 px-4 py-4 flex items-center gap-3">
-        <button onClick={handleBeeClick} className="text-2xl select-none">🐝</button>
-        <h1 className="text-lg font-bold text-white">pokebee 打卡</h1>
-        <span className="ml-auto text-xs text-stone-500">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
+    <div className="app-bg min-h-dvh">
+      <div className="bg-brand/95 px-4 py-4 flex items-center gap-3 shadow-sm">
+        <button onClick={handleBeeClick} aria-label="logo" className="text-2xl select-none focus:outline-none">🐝</button>
+        <h1 className="text-lg font-bold text-brand-cream tracking-wide">pokebee 打卡</h1>
+        <span className="ml-auto text-xs text-brand-cream/40">{process.env.NEXT_PUBLIC_BUILD_SHA}</span>
       </div>
 
       <main className="mx-auto w-full max-w-lg px-4 py-6 lg:max-w-2xl lg:py-10">
@@ -203,15 +211,16 @@ export default function Home() {
         )}
 
         {view === "punch" && employee && (
-          <div className="flex flex-col items-center gap-6 pt-6 lg:gap-8 lg:pt-8">
-            <p className="text-2xl font-bold text-gray-800 lg:text-4xl">{employee}</p>
+          <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-6 lg:gap-8 lg:px-8 lg:pt-8">
+            <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
+            <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
             {missingPunches.length > 0 && (
-              <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4 lg:max-w-md lg:p-5">
+              <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50/95 p-4 shadow-sm lg:max-w-md lg:p-5">
                 <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
                 {missingPunches.map((mp, i) => (
                   <button key={i} onClick={() => prefillFromMissing(mp)}
-                    className="mb-1 block w-full rounded-lg bg-amber-100 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
+                    className="mb-1 block w-full rounded-xl bg-amber-100/90 px-3 py-2 text-left text-sm text-amber-900 transition-all active:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
                     {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
                     {mp.existing_time && (
                       <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
@@ -226,10 +235,10 @@ export default function Home() {
               <div className="w-full max-w-sm lg:max-w-md">
                 <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
                 <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 lg:px-4 lg:py-3 lg:text-base" />
+                  className="input-soft w-full lg:px-4 lg:py-3 lg:text-base" />
               </div>
             )}
-            <p className="text-sm text-gray-500 lg:text-lg">選擇打卡類型</p>
+            <p className="text-sm font-medium text-brand-soft/70 lg:text-lg">選擇打卡類型</p>
             <div className="flex w-full max-w-sm flex-col gap-4 lg:max-w-md lg:gap-5">
               <DirectionButton label="上班" emoji="🟢" suggested={suggested === "in"} onClick={() => handlePunch("in")} />
               <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
@@ -237,26 +246,26 @@ export default function Home() {
 
             <div className="flex w-full max-w-sm gap-3 pt-2 lg:max-w-md lg:gap-4">
               <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
-                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98] lg:py-4 lg:text-base">
+                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 📝 補登打卡
               </button>
               <button onClick={goToOvertime}
-                className="flex-1 rounded-xl bg-white px-3 py-3 text-sm font-medium text-gray-600 shadow-sm transition-all hover:bg-stone-100 active:scale-[0.98] lg:py-4 lg:text-base">
+                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 🕐 加班申請
               </button>
             </div>
 
-            <button onClick={resetToPin} className="text-sm text-gray-400 underline-offset-2 hover:underline lg:text-base">取消</button>
+            <button onClick={resetToPin} className="text-sm text-brand-soft/60 underline-offset-2 lg:text-base">取消</button>
           </div>
         )}
 
         {view === "supplement" && employee && (
-          <div className="flex flex-col items-center gap-6 pt-8">
-            <p className="text-2xl font-bold text-gray-800">{employee}・補登打卡</p>
+          <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-8">
+            <p className="text-2xl font-bold text-brand">{employee}・補登打卡</p>
             {error && <p className="text-sm font-medium text-red-500">{error}</p>}
 
             {supContext && supContext.existing_time && (
-              <div className="w-full max-w-sm rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="w-full max-w-sm rounded-2xl border border-blue-200 bg-blue-50 p-4">
                 <p className="text-sm text-blue-800">
                   📋 {supContext.date} {supContext.shift}
                   {" "}已有<span className="font-semibold">{supContext.missing === "out" ? "上班" : "下班"}</span>紀錄：
@@ -271,7 +280,7 @@ export default function Home() {
             <div className="w-full max-w-sm space-y-4">
               <Field label="日期">
                 <input type="date" value={supDate} onChange={(e) => setSupDate(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                  className="input-soft w-full" />
               </Field>
               <Field label="類型">
                 <div className="flex gap-3">
@@ -281,38 +290,38 @@ export default function Home() {
               </Field>
               <Field label="時間">
                 <input type="time" value={supTime} onChange={(e) => setSupTime(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                  className="input-soft w-full" />
               </Field>
               <button onClick={handleSupplement} disabled={loading}
-                className="w-full rounded-2xl bg-stone-800 py-4 text-lg font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-md transition-all active:scale-95 disabled:opacity-50">
                 {loading ? "送出中…" : "送出補登"}
               </button>
             </div>
-            <button onClick={() => { setError(null); setSupContext(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+            <button onClick={() => { setError(null); setSupContext(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2">返回</button>
           </div>
         )}
 
         {view === "overtime" && employee && (
-          <div className="flex flex-col items-center gap-6 pt-8">
-            <p className="text-2xl font-bold text-gray-800">{employee}・加班申請</p>
+          <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-8">
+            <p className="text-2xl font-bold text-brand">{employee}・加班申請</p>
             {error && <p className="text-sm font-medium text-red-500">{error}</p>}
             <div className="w-full max-w-sm space-y-4">
               <Field label="日期">
                 <input type="date" value={otDate} onChange={(e) => setOtDate(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                  className="input-soft w-full" />
               </Field>
               <Field label="開始時間">
                 <input type="time" value={otStart} onChange={(e) => setOtStart(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                  className="input-soft w-full" />
               </Field>
               <Field label="結束時間">
                 <input type="time" value={otEnd} onChange={(e) => setOtEnd(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                  className="input-soft w-full" />
               </Field>
               <Field label="原因（選填）">
                 <input type="text" value={otReason} onChange={(e) => setOtReason(e.target.value)}
                   placeholder="例：活動準備、盤點…"
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700" />
+                  className="input-soft w-full" />
               </Field>
               {otStart && otEnd && (() => {
                 const diff = hmToMin(otEnd) - hmToMin(otStart);
@@ -324,7 +333,7 @@ export default function Home() {
                 ) : null;
               })()}
               <button onClick={handleOvertime} disabled={loading}
-                className="w-full rounded-2xl bg-stone-800 py-4 text-lg font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-md transition-all active:scale-95 disabled:opacity-50">
                 {loading ? "送出中…" : "送出申請"}
               </button>
             </div>
@@ -342,7 +351,7 @@ export default function Home() {
                     const ageMs = Date.now() - new Date(r.submitted_at).getTime();
                     const canRevoke = ageMs < 24 * 60 * 60 * 1000;
                     return (
-                      <div key={r.submitted_at} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2">
+                      <div key={r.submitted_at} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white/95 px-3 py-2 shadow-[0_2px_12px_rgba(90,58,40,0.06)]">
                         <div className="text-sm text-gray-700">
                           <span className="font-medium">{r.date}</span>{" "}
                           <span className="text-gray-500">{r.start_time}-{r.end_time}</span>{" "}
@@ -351,7 +360,7 @@ export default function Home() {
                         </div>
                         {canRevoke ? (
                           <button onClick={() => revokeOt(r.submitted_at)} disabled={loading}
-                            className="ml-2 shrink-0 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-40">
+                            className="ml-2 shrink-0 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition-colors active:bg-red-100 disabled:opacity-40">
                             撤回
                           </button>
                         ) : (
@@ -364,14 +373,15 @@ export default function Home() {
               )}
             </div>
 
-            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-gray-400 underline-offset-2 hover:underline">返回</button>
+            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2">返回</button>
           </div>
         )}
 
         {view === "success" && (
-          <div className="flex flex-col items-center justify-center gap-4 pt-16 text-center">
-            <div className="text-6xl">✅</div>
-            <p className="text-xl font-bold text-gray-800">{successMsg}</p>
+          <div className="glass-panel mx-auto flex max-w-sm flex-col items-center justify-center gap-4 rounded-[1.75rem] px-6 py-10 text-center">
+            <Image src="/icon-512.png" alt="" width={120} height={120} className="rounded-3xl shadow-md ring-4 ring-brand-honey/25" />
+            <div className="text-5xl">✅</div>
+            <p className="text-xl font-bold text-brand">{successMsg}</p>
           </div>
         )}
       </main>
@@ -382,11 +392,13 @@ export default function Home() {
 function DirectionButton({ label, emoji, suggested, onClick }: { label: string; emoji: string; suggested: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`flex items-center justify-center gap-3 rounded-2xl py-6 text-2xl font-bold shadow-sm transition-all active:scale-95 lg:gap-5 lg:py-10 lg:text-4xl ${
-        suggested ? "bg-stone-800 text-white ring-4 ring-stone-300" : "bg-white text-gray-700"
+      className={`flex items-center justify-center gap-3 rounded-3xl py-6 text-2xl font-bold shadow-md transition-all active:scale-95 lg:gap-5 lg:py-10 lg:text-4xl ${
+        suggested
+          ? "bg-brand text-brand-cream ring-4 ring-brand-accent/40"
+          : "border border-brand-honey/20 bg-white/95 text-brand-soft"
       }`}>
       <span>{emoji}</span><span>{label}</span>
-      {suggested && <span className="text-xs font-normal opacity-70 lg:text-sm">（建議）</span>}
+      {suggested && <span className="rounded-full bg-brand-honey/20 px-2 py-0.5 text-xs font-normal opacity-90 lg:text-sm">建議</span>}
     </button>
   );
 }
@@ -398,8 +410,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ToggleBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button onClick={onClick}
-      className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${
-        active ? "bg-stone-800 text-white" : "bg-stone-100 text-gray-500"
+      className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all active:scale-95 ${
+        active ? "bg-brand text-brand-cream shadow-sm" : "bg-brand-sand/85 text-brand-soft/70 active:bg-brand-sand"
       }`}>
       {children}
     </button>
