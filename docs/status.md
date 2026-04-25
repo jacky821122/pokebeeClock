@@ -18,9 +18,6 @@
     * v1 不做 admin 訊息管理 UI，老闆直接編 Sheet。等麻煩到再做。
     * 不開放員工打字回應（iPad 打字慢、又要審核機制，太重）。
     * 拆獨立 branch 做（功能改動跟視覺改動分開 review）。
-1. **視覺收尾**（feat/visual-refresh 尚未 merge）—
-    * 此 branch 暫時開了 `NEXT_PUBLIC_BYPASS_AUTH=1` 跳過 admin/setup/device 驗證以利 preview，**merge 前必須移除**所有 `// BYPASS` 標記的程式碼（lib/device.ts、3 個 admin route、admin/page.tsx）。
-
 6. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
 7. **展示層報表實機驗證** — 用真實資料跑 `scripts/generate_report.ts`，比對舊版 V1 output 差異。
@@ -83,6 +80,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-26 — 視覺改版：pokebee logo + 棕色品牌色系（brand/cream/sand/honey/accent）、PWA icons 補齊、漸層背景 + glass-panel + honey 色脈、移除 hover/加 touch 化、greeting 文字（早/午/晚安）、補登/加班頁面用 input-soft 統一、重算按鈕 amber→rose
 - 2026-04-26 — 移除 amendments（補登申請）功能：`/amend` 頁、`/api/amend`、`AmendForm`、Sheet `amendments` tab 全數刪除；report_generator 移除 amendments 區塊
 - 2026-04-25 — Device token 來源從 env 改為 Sheet `devices` tab：管理權統一在 Sheet edit access、撤銷免 redeploy、無 cache 即時生效
 - 2026-04-25 — iPad 橫屏 (lg:) 放大 PinPad、打卡主畫面字級與按鈕

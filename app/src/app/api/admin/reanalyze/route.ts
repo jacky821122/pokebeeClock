@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { reanalyzeAllEmployees } from "@/lib/analyzer_bridge";
 
 function checkAuth(req: NextRequest): boolean {
-  // BYPASS: feat/visual-refresh preview convenience. Remove before merging.
-  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return true;
   const expected = process.env.ADMIN_SECRET;
   if (!expected) return false;
   return req.headers.get("authorization") === `Bearer ${expected}`;

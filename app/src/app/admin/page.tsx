@@ -25,11 +25,6 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    // BYPASS: feat/visual-refresh preview convenience. Remove before merging.
-    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") {
-      setSecret("preview");
-      return;
-    }
     const cached = sessionStorage.getItem(SECRET_KEY);
     if (cached) setSecret(cached);
   }, []);
