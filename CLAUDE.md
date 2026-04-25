@@ -24,6 +24,46 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 - **Normalize**: unified `roundToHalfHour` for both in and out. No grace period, no directional bias.
 - **Python parity is no longer a goal.** V2 intentionally diverges from the Python analyzer. The parity test has been replaced with V2-specific tests.
 
+## Visual style
+
+Brand palette is defined as Tailwind v4 `@theme` tokens in `app/src/app/globals.css`. Use the tokens, not arbitrary `stone-*` / `gray-*` classes:
+
+- `bg-brand` / `text-brand` — primary deep brown (`#3d2418`)
+- `text-brand-soft` — secondary text (`#5a3a28`)
+- `bg-brand-cream` — page background (`#fdf8f3`)
+- `bg-brand-sand` — soft accents / disabled toggles
+- `brand-accent` — ring colour for emphasis
+- `brand-honey` — pill/ring accents on buttons and borders
+
+Reusable component classes in `globals.css`:
+- `.app-bg` — gradient page background (use on root `<div>` of each page that needs the lift)
+- `.glass-panel` — semi-transparent white card with blur + soft shadow; wrap each view's content
+- `.input-soft` — unified input styling (replaces ad-hoc `border-gray-200 bg-white`)
+
+Touch UX:
+- **No `hover:` classes on the punch flow.** iPad is the target; hover gets stuck on touch. Use `active:` for press feedback.
+- `touch-action: manipulation` and transparent tap-highlight are set globally on `button`.
+
+Semantic colours (don't replace with brand tokens):
+- amber → warning (e.g. missing-punch alert)
+- rose / red → destructive (e.g. reanalyze, revoke)
+- blue → informational
+- green → success
+
+## Dev convenience: `NEXT_PUBLIC_BYPASS_AUTH`
+
+Long-running feature branches that need Vercel preview can opt-in to a temporary auth bypass so the manager can preview without device tokens or `ADMIN_SECRET`. The convention:
+
+- In `lib/device.ts` `checkDevice` and each admin route's `checkAuth`, add at the top:
+  ```ts
+  // BYPASS: <branch-name> preview convenience. Remove before merging.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return /* ok */;
+  ```
+- Mirror it in `app/admin/page.tsx` to skip the secret prompt client-side.
+- On the Vercel project, set `NEXT_PUBLIC_BYPASS_AUTH=1` for **Preview only** — never Production.
+- Every BYPASS block must carry a `// BYPASS:` comment so it's grep-findable.
+- Before merging, run `grep -rn "BYPASS" app/src/` and remove all of them. CI / review must reject any PR to main that still contains `BYPASS`.
+
 ## Time zone
 
 All timestamps are stored and displayed in **Asia/Taipei (UTC+8)**. Vercel runs in UTC — convert at the boundary before calling the analyzer.
