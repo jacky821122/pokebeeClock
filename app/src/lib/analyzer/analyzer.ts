@@ -306,6 +306,12 @@ export function analyzeEmployee(
     } else if (e.kind === "clock-out") {
       if (currentIn === null) {
         consumePair(null, e.timestamp, true);
+      } else if (e.timestamp && fmtDate(currentIn) !== fmtDate(e.timestamp)) {
+        // Cross-date pair → two separate missing-punch records (the in's
+        // date is missing an out; the out's date is missing an in).
+        consumePair(currentIn, null);
+        consumePair(null, e.timestamp, true);
+        currentIn = null;
       } else {
         consumePair(currentIn, e.timestamp);
         currentIn = null;
