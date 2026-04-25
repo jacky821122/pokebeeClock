@@ -126,7 +126,7 @@ export default function Home() {
     setMissingPunches((prev) => prev.filter(
       (mp) => !(mp.date === supDate && mp.missing === supKind)
     ));
-    showSuccessAndReturn(`${employee}・${supDate} 補登${supKind === "in" ? "上班" : "下班"}成功`);
+    showSuccessAndReturn(`${employee}・${supDate} ${supTime} 補登${supKind === "in" ? "上班" : "下班"}`);
     fetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts, kind: supKind, source: "supplement" }),
     }).catch(() => {});
