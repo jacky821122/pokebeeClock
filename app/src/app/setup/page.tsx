@@ -31,19 +31,19 @@ function SetupInner() {
   }
 
   return (
-    <div className="min-h-dvh bg-stone-50">
-      <div className="bg-stone-800 px-4 py-4">
-        <h1 className="text-lg font-bold text-white">pokebee 裝置設定</h1>
+    <div className="min-h-dvh bg-brand-cream">
+      <div className="bg-brand px-4 py-4 shadow-sm">
+        <h1 className="text-lg font-bold text-brand-cream tracking-wide">pokebee 裝置設定</h1>
       </div>
       <main className="mx-auto w-full max-w-md px-4 py-10">
         <div className="space-y-5">
           <div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-brand-soft">
               此裝置尚未授權。請輸入管理者提供的 setup code 完成設定。
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-600">Setup code</label>
+            <label className="mb-1 block text-sm font-medium text-brand-soft">Setup code</label>
             <input
               type="text"
               value={code}
@@ -51,7 +51,7 @@ function SetupInner() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-base text-gray-700"
+              className="w-full rounded-xl border border-brand-sand bg-white px-3 py-3 text-base text-brand"
               placeholder="貼上或輸入 setup code"
             />
           </div>
@@ -59,11 +59,11 @@ function SetupInner() {
           <button
             onClick={handleSubmit}
             disabled={loading || !code.trim()}
-            className="w-full rounded-2xl bg-stone-800 py-4 text-lg font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            className="w-full rounded-2xl bg-brand py-4 text-lg font-bold text-brand-cream shadow-sm transition-all active:scale-95 disabled:opacity-50"
           >
             {loading ? "驗證中…" : "完成設定"}
           </button>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-brand-soft/60">
             設定後 token 會儲存在此瀏覽器，不需重複輸入。失效時會自動回到此頁。
           </p>
         </div>

@@ -208,16 +208,16 @@ export default function Home() {
             <p className="text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
             {missingPunches.length > 0 && (
-              <div className="w-full max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-4 lg:max-w-md lg:p-5">
-                <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
+              <div className="w-full max-w-sm rounded-xl border border-rose-300 bg-rose-50 p-4 lg:max-w-md lg:p-5">
+                <p className="mb-2 text-sm font-semibold text-rose-800 lg:text-base">⚠️ 缺卡紀錄</p>
                 {missingPunches.map((mp, i) => (
                   <button key={i} onClick={() => prefillFromMissing(mp)}
-                    className="mb-1 block w-full rounded-lg bg-amber-100 px-3 py-2 text-left text-sm text-amber-900 transition-colors hover:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
+                    className="mb-1 block w-full rounded-lg bg-rose-100 px-3 py-2 text-left text-sm text-rose-900 transition-colors hover:bg-rose-200 lg:px-4 lg:py-3 lg:text-base">
                     {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
                     {mp.existing_time && (
-                      <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
+                      <span className="ml-1 text-xs text-rose-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
                     )}
-                    <span className="ml-2 text-xs text-amber-600 lg:text-sm">點擊補登 →</span>
+                    <span className="ml-2 text-xs text-rose-600 lg:text-sm">點擊補登 →</span>
                   </button>
                 ))}
               </div>

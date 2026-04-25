@@ -43,19 +43,19 @@ export default function AdminPage() {
   if (!secret) {
     return (
       <div className="mx-auto w-full max-w-sm px-4 py-20">
-        <h1 className="mb-6 text-xl font-bold">管理者登入</h1>
+        <h1 className="mb-6 text-xl font-bold text-brand">管理者登入</h1>
         <input
           type="password"
           value={secretInput}
           onChange={(e) => setSecretInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && tryAuth(secretInput)}
           placeholder="ADMIN_SECRET"
-          className="mb-3 w-full rounded border border-stone-300 px-3 py-2"
+          className="mb-3 w-full rounded border border-brand-sand px-3 py-2"
         />
         {authError && <p className="mb-3 text-sm text-red-500">{authError}</p>}
         <button
           onClick={() => tryAuth(secretInput)}
-          className="w-full rounded bg-stone-800 py-2 text-white"
+          className="w-full rounded bg-brand py-2 text-white"
         >
           進入
         </button>
@@ -78,10 +78,10 @@ function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () =
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold">管理後台</h1>
+        <h1 className="text-xl font-bold text-brand">管理後台</h1>
         <div className="flex items-center gap-4">
-          <a href="/" className="text-sm text-stone-500 hover:underline">← 打卡系統</a>
-          <button onClick={onSignOut} className="text-sm text-gray-500 hover:underline">
+          <a href="/" className="text-sm text-brand-soft hover:underline">← 打卡系統</a>
+          <button onClick={onSignOut} className="text-sm text-brand-soft/70 hover:underline">
             登出
           </button>
         </div>
@@ -134,12 +134,12 @@ function ReportDownload({ secret }: { secret: string }) {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="rounded border border-stone-300 px-3 py-2"
+          className="rounded border border-brand-sand px-3 py-2"
         />
         <button
           onClick={download}
           disabled={loading}
-          className="rounded bg-stone-800 px-4 py-2 text-white disabled:opacity-40"
+          className="rounded bg-brand px-4 py-2 text-white disabled:opacity-40"
         >
           {loading ? "產生中…" : "下載 xlsx"}
         </button>
@@ -188,7 +188,7 @@ function ReanalyzeAll({ secret }: { secret: string }) {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="rounded border border-stone-300 px-3 py-2"
+          className="rounded border border-brand-sand px-3 py-2"
         />
         <button
           onClick={run}
@@ -307,12 +307,12 @@ function EmployeesTable({ secret }: { secret: string }) {
       )}
 
       {loading ? (
-        <p className="text-gray-400">載入中…</p>
+        <p className="text-brand-soft/50">載入中…</p>
       ) : (
         <>
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b border-stone-300 text-left">
+              <tr className="border-b border-brand-sand text-left">
                 <th className="py-2 pr-3">名稱</th>
                 <th className="py-2 pr-3">PIN</th>
                 <th className="py-2 pr-3">身份</th>
@@ -333,7 +333,7 @@ function EmployeesTable({ secret }: { secret: string }) {
               <div className="flex gap-2">
                 <button
                   onClick={addDraft}
-                  className="rounded border border-stone-400 px-3 py-1 text-sm"
+                  className="rounded border border-brand-soft/40 px-3 py-1 text-sm"
                 >
                   + 新增一列
                 </button>
@@ -348,11 +348,11 @@ function EmployeesTable({ secret }: { secret: string }) {
             </div>
 
             {drafts.length === 0 ? (
-              <p className="py-4 text-sm text-gray-400">尚無新增列。點「+ 新增一列」開始。</p>
+              <p className="py-4 text-sm text-brand-soft/50">尚無新增列。點「+ 新增一列」開始。</p>
             ) : (
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-stone-300 text-left">
+                  <tr className="border-b border-brand-sand text-left">
                     <th className="py-2 pr-3 w-10">選取</th>
                     <th className="py-2 pr-3">名稱</th>
                     <th className="py-2 pr-3">PIN</th>
@@ -408,7 +408,7 @@ function EmployeeRow({
   }
 
   return (
-    <tr className="border-b border-stone-100">
+    <tr className="border-b border-brand-sand/50">
       <td className="py-2 pr-3">{employee.name}</td>
       <td className="py-2 pr-3">
         <input
@@ -416,14 +416,14 @@ function EmployeeRow({
           onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
           inputMode="numeric"
           maxLength={4}
-          className="w-20 rounded border border-stone-300 px-2 py-1 tracking-widest"
+          className="w-20 rounded border border-brand-sand px-2 py-1 tracking-widest"
         />
       </td>
       <td className="py-2 pr-3">
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as "full_time" | "hourly")}
-          className="rounded border border-stone-300 px-2 py-1"
+          className="rounded border border-brand-sand px-2 py-1"
         >
           <option value="full_time">正職</option>
           <option value="hourly">計時</option>
@@ -436,7 +436,7 @@ function EmployeeRow({
         <button
           onClick={submit}
           disabled={!canSave}
-          className="rounded bg-stone-800 px-3 py-1 text-white disabled:opacity-30"
+          className="rounded bg-brand px-3 py-1 text-white disabled:opacity-30"
         >
           {saving ? "…" : "儲存"}
         </button>
@@ -455,7 +455,7 @@ function DraftRowView({
   onRemove: (id: number) => void;
 }) {
   return (
-    <tr className="border-b border-stone-100 bg-stone-50">
+    <tr className="border-b border-brand-sand/50 bg-brand-sand/30">
       <td className="py-2 pr-3">
         <input
           type="checkbox"
@@ -468,7 +468,7 @@ function DraftRowView({
           value={draft.name}
           onChange={(e) => onChange(draft.id, { name: e.target.value })}
           placeholder="員工姓名"
-          className="w-full rounded border border-stone-300 px-2 py-1"
+          className="w-full rounded border border-brand-sand px-2 py-1"
         />
       </td>
       <td className="py-2 pr-3">
@@ -478,14 +478,14 @@ function DraftRowView({
           inputMode="numeric"
           maxLength={4}
           placeholder="----"
-          className="w-20 rounded border border-stone-300 px-2 py-1 tracking-widest"
+          className="w-20 rounded border border-brand-sand px-2 py-1 tracking-widest"
         />
       </td>
       <td className="py-2 pr-3">
         <select
           value={draft.role}
           onChange={(e) => onChange(draft.id, { role: e.target.value as "full_time" | "hourly" })}
-          className="rounded border border-stone-300 px-2 py-1"
+          className="rounded border border-brand-sand px-2 py-1"
         >
           <option value="full_time">正職</option>
           <option value="hourly">計時</option>
