@@ -83,16 +83,31 @@ export default function Home() {
   const [otRecords, setOtRecords] = useState<OtRecord[]>([]);
   const [otLoading, setOtLoading] = useState(false);
 
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [bossMessage, setBossMessage] = useState<string | null>(null);
   const [bossResponded, setBossResponded] = useState<string | null>(null);
+  const [showBossArea, setShowBossArea] = useState(false);
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
 
   function resetToPin() {
+    if (successTimer.current) { clearTimeout(successTimer.current); successTimer.current = null; }
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
+    setPendingMessage(null); setBossMessage(null); setBossResponded(null); setShowBossArea(false);
+  }
+
+  async function prefetchBossMessage() {
+    setPendingMessage(null);
+    try {
+      const res = await apiFetch("/api/message");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.text) setPendingMessage(data.text);
+    } catch { /* ignore — fallback handled by render */ }
   }
 
   async function handlePin(enteredPin: string) {
@@ -109,22 +124,21 @@ export default function Home() {
       setMissingPunches(data.missing_punches ?? []);
       setCustomTs(nowTaipeiLocal()); setSupDate(todayTaipei()); setOtDate(todayTaipei());
       setView("punch");
+      prefetchBossMessage();
     } catch { setError("網路錯誤，請再試一次"); setPinKey((k) => k + 1); }
     finally { setLoading(false); }
   }
 
-  function showSuccess(msg: string, delayMs = 2500) {
-    setSuccessMsg(msg); setView("success"); setTimeout(resetToPin, delayMs);
-  }
-
-  async function fetchBossMessage() {
-    setBossMessage(null); setBossResponded(null);
-    try {
-      const res = await apiFetch("/api/message");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.text) setBossMessage(data.text);
-    } catch { /* ignore — fallback handled by render */ }
+  function showSuccess(msg: string, opts: { withBossMessage?: boolean } = {}) {
+    const msgToShow = opts.withBossMessage ? pendingMessage : null;
+    setSuccessMsg(msg);
+    setBossMessage(msgToShow);
+    setBossResponded(null);
+    setShowBossArea(!!opts.withBossMessage);
+    setView("success");
+    if (successTimer.current) clearTimeout(successTimer.current);
+    const delay = msgToShow ? 5000 : 2500;
+    successTimer.current = setTimeout(resetToPin, delay);
   }
 
   function respondToBoss(emoji: string) {
@@ -134,6 +148,9 @@ export default function Home() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ employee, message_text: bossMessage, response: emoji }),
     }).catch(() => {});
+    // Quick exit on response — task is done, no need to wait out the 5s window.
+    if (successTimer.current) clearTimeout(successTimer.current);
+    successTimer.current = setTimeout(resetToPin, 700);
   }
 
   /** Brief success flash, then return to punch view (stay logged in) */
@@ -144,8 +161,7 @@ export default function Home() {
 
   function handlePunch(k: PunchKind) {
     if (!employee) return;
-    showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`);
-    fetchBossMessage();
+    showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`, { withBossMessage: true });
     apiFetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts: toClientTs(customTs), kind: k }),
     }).catch(() => {});
@@ -406,11 +422,13 @@ export default function Home() {
             <div className="text-5xl">✅</div>
             <p className="text-xl font-bold text-brand">{successMsg}</p>
 
-            {bossMessage ? (
-              <BossMessageCard text={bossMessage} responded={bossResponded} onRespond={respondToBoss} />
-            ) : (
-              /* Fallback when messages tab is empty / fetch failed: subtle static line */
-              <p className="mt-2 text-sm text-brand-soft/60">今天也辛苦了 🐝</p>
+            {showBossArea && (
+              bossMessage ? (
+                <BossMessageCard text={bossMessage} responded={bossResponded} onRespond={respondToBoss} />
+              ) : (
+                /* Fallback when messages tab is empty / prefetch failed: subtle static line */
+                <p className="mt-2 text-sm text-brand-soft/60">今天也辛苦了 🐝</p>
+              )
             )}
           </div>
         )}
