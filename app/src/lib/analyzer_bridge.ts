@@ -90,10 +90,6 @@ export async function reanalyzeAllEmployees(yyyyMm: string): Promise<{ count: nu
   for (const emp of employees) {
     try {
       const rows = punchMap.get(emp.name) ?? [];
-      if (rows.length === 0) {
-        count++;
-        continue;
-      }
       const isFullTime = emp.role === "full_time";
       const events = punchesToEvents(rows);
       const { records } = analyzeEmployee(emp.name, events, isFullTime);
