@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
 
   const messages = await getActiveMessages();
   const picked = pickWeighted(messages);
-  return NextResponse.json({ text: picked?.text ?? null });
+  // Sentinel: a row with text === "NONE" lets the manager allocate weight to
+  // "show no boss message" without the client inventing fallback behavior.
+  const text = picked && picked.text !== "NONE" ? picked.text : null;
+  return NextResponse.json({ text });
 }
 
 export async function POST(req: NextRequest) {
