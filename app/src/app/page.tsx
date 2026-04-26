@@ -83,7 +83,6 @@ export default function Home() {
   const [otRecords, setOtRecords] = useState<OtRecord[]>([]);
   const [otLoading, setOtLoading] = useState(false);
 
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [bossMessage, setBossMessage] = useState<string | null>(null);
   const [bossResponded, setBossResponded] = useState<string | null>(null);
   const [showBossArea, setShowBossArea] = useState(false);
@@ -100,13 +99,13 @@ export default function Home() {
     if (successTimer.current) { clearTimeout(successTimer.current); successTimer.current = null; }
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
-    setPendingMessage(null); setBossMessage(null); setBossResponded(null); setShowBossArea(false);
+    setBossMessage(null); setBossResponded(null); setShowBossArea(false);
     setCountdownMs(0);
+    prefetchPromise.current = null;
   }
 
   function prefetchBossMessage() {
-    setPendingMessage(null);
-    const p: Promise<string | null> = (async () => {
+    prefetchPromise.current = (async () => {
       try {
         const res = await apiFetch("/api/message");
         if (!res.ok) return null;
@@ -114,13 +113,11 @@ export default function Home() {
         return (data.text as string | null) ?? null;
       } catch { return null; }
     })();
-    prefetchPromise.current = p;
-    p.then((text) => setPendingMessage(text));
   }
 
   async function awaitBossText(): Promise<string | null> {
     const pending = prefetchPromise.current;
-    if (!pending) return pendingMessage;
+    if (!pending) return null;
     // Cap the wait so a slow Sheets call can't block the success view forever.
     return Promise.race<string | null>([
       pending,

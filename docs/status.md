@@ -8,16 +8,6 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-0. **「老闆的話」功能（成功打卡後顯示）** —
-    * 老闆 ↔ 員工的小溝通介面：成功打卡時抽一條老闆訊息顯示在 ✅ 下方，員工可在自動跳回前點固定 emoji 回應（❤️🙏🤔），不延長 timer。
-    * Sheet 設計（避免 id 對照麻煩，直接存文字）：
-      - 新 tab `messages`：`text | active | weight | created_at`（沒有 id）
-      - 新 tab `message_responses`：`employee | message_text | response | timestamp`（直接存原訊息文字，方便事後閱讀，不必回 messages 對照）
-    * 隨機策略：每次打卡獨立加權隨機；不做「同日同人不重複」。
-    * Fallback：訊息表空時顯示固定兜底文案（例如「今天也辛苦了 🐝」）。
-    * v1 不做 admin 訊息管理 UI，老闆直接編 Sheet。等麻煩到再做。
-    * 不開放員工打字回應（iPad 打字慢、又要審核機制，太重）。
-    * 拆獨立 branch 做（功能改動跟視覺改動分開 review）。
 6. **PWA install-to-home 實機驗證（iPad Safari）** — 
     * 最終情境是 iPad 常駐主頁，瀏覽器跑和 PWA 跑的快取/離線行為不同，沒實測過不算 MVP 完成。
 7. **展示層報表實機驗證** — 用真實資料跑 `scripts/generate_report.ts`，比對舊版 V1 output 差異。
@@ -80,6 +70,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-04-27 — 「老闆的話」上線：成功打卡時依 `messages` tab 加權抽一條顯示，固定 emoji 回應寫入 `message_responses`；倒數進度條顯示自動跳轉時限，回覆後立即收掉並 1.2s 結束；text=NONE sentinel 控制「不顯示」機率；prefetch on PIN，handlePunch 等 prefetch（2s timeout）避免空白
 - 2026-04-26 — 視覺改版：pokebee logo + 棕色品牌色系（brand/cream/sand/honey/accent）、PWA icons 補齊、漸層背景 + glass-panel + honey 色脈、移除 hover/加 touch 化、greeting 文字（早/午/晚安）、補登/加班頁面用 input-soft 統一、重算按鈕 amber→rose
 - 2026-04-26 — 移除 amendments（補登申請）功能：`/amend` 頁、`/api/amend`、`AmendForm`、Sheet `amendments` tab 全數刪除；report_generator 移除 amendments 區塊
 - 2026-04-25 — Device token 來源從 env 改為 Sheet `devices` tab：管理權統一在 Sheet edit access、撤銷免 redeploy、無 cache 即時生效
