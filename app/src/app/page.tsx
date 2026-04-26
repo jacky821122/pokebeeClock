@@ -93,6 +93,7 @@ export default function Home() {
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchPromise = useRef<Promise<string | null> | null>(null);
   const router = useRouter();
 
   function resetToPin() {
@@ -103,14 +104,28 @@ export default function Home() {
     setCountdownMs(0);
   }
 
-  async function prefetchBossMessage() {
+  function prefetchBossMessage() {
     setPendingMessage(null);
-    try {
-      const res = await apiFetch("/api/message");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.text) setPendingMessage(data.text);
-    } catch { /* ignore — fallback handled by render */ }
+    const p: Promise<string | null> = (async () => {
+      try {
+        const res = await apiFetch("/api/message");
+        if (!res.ok) return null;
+        const data = await res.json();
+        return (data.text as string | null) ?? null;
+      } catch { return null; }
+    })();
+    prefetchPromise.current = p;
+    p.then((text) => setPendingMessage(text));
+  }
+
+  async function awaitBossText(): Promise<string | null> {
+    const pending = prefetchPromise.current;
+    if (!pending) return pendingMessage;
+    // Cap the wait so a slow Sheets call can't block the success view forever.
+    return Promise.race<string | null>([
+      pending,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+    ]);
   }
 
   async function handlePin(enteredPin: string) {
@@ -132,8 +147,8 @@ export default function Home() {
     finally { setLoading(false); }
   }
 
-  function showSuccess(msg: string, opts: { withBossMessage?: boolean } = {}) {
-    const msgToShow = opts.withBossMessage ? pendingMessage : null;
+  function showSuccess(msg: string, opts: { bossText?: string | null } = {}) {
+    const msgToShow = opts.bossText ?? null;
     setSuccessMsg(msg);
     setBossMessage(msgToShow);
     setBossResponded(null);
@@ -169,12 +184,13 @@ export default function Home() {
     setTimeout(() => { setView("punch"); setError(null); }, 1500);
   }
 
-  function handlePunch(k: PunchKind) {
+  async function handlePunch(k: PunchKind) {
     if (!employee) return;
-    showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`, { withBossMessage: true });
     apiFetch("/api/punch", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pin, client_ts: toClientTs(customTs), kind: k }),
     }).catch(() => {});
+    const bossText = await awaitBossText();
+    showSuccess(`${employee}・${k === "in" ? "上班" : "下班"}打卡成功`, { bossText });
   }
 
   function handleSupplement() {
