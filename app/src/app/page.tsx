@@ -137,13 +137,17 @@ export default function Home() {
     setSuccessMsg(msg);
     setBossMessage(msgToShow);
     setBossResponded(null);
-    setShowBossArea(!!opts.withBossMessage);
+    setShowBossArea(!!msgToShow);
     setView("success");
     if (successTimer.current) clearTimeout(successTimer.current);
-    const delay = msgToShow ? 5000 : 2500;
-    setCountdownMs(delay);
-    setCountdownKey((k) => k + 1);
-    successTimer.current = setTimeout(resetToPin, delay);
+    if (msgToShow) {
+      setCountdownMs(5000);
+      setCountdownKey((k) => k + 1);
+      successTimer.current = setTimeout(resetToPin, 5000);
+    } else {
+      setCountdownMs(0);
+      successTimer.current = setTimeout(resetToPin, 2500);
+    }
   }
 
   function respondToBoss(emoji: string) {
@@ -428,13 +432,8 @@ export default function Home() {
             <div className="text-5xl">✅</div>
             <p className="text-xl font-bold text-brand">{successMsg}</p>
 
-            {showBossArea && (
-              bossMessage ? (
-                <BossMessageCard text={bossMessage} responded={bossResponded} onRespond={respondToBoss} />
-              ) : (
-                /* Fallback when messages tab is empty / prefetch failed: subtle static line */
-                <p className="mt-2 text-sm text-brand-soft/60">今天也辛苦了 🐝</p>
-              )
+            {showBossArea && bossMessage && (
+              <BossMessageCard text={bossMessage} responded={bossResponded} onRespond={respondToBoss} />
             )}
 
             {countdownMs > 0 && (
