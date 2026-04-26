@@ -437,7 +437,11 @@ export default function Home() {
   );
 }
 
-const BOSS_RESPONSES = ["❤️", "🙏", "🤔"] as const;
+const BOSS_RESPONSES: { emoji: string; label: string }[] = [
+  { emoji: "❤️", label: "收到" },
+  { emoji: "🙏", label: "謝謝" },
+  { emoji: "🤔", label: "嗯…" },
+];
 
 function BossMessageCard({ text, responded, onRespond }: { text: string; responded: string | null; onRespond: (emoji: string) => void }) {
   return (
@@ -445,7 +449,7 @@ function BossMessageCard({ text, responded, onRespond }: { text: string; respond
       <p className="text-xs font-semibold tracking-wide text-brand-soft/80">老闆的話</p>
       <p className="mt-1 text-sm text-brand">{text}</p>
       <div className="mt-2 flex justify-end gap-2">
-        {BOSS_RESPONSES.map((emoji) => {
+        {BOSS_RESPONSES.map(({ emoji, label }) => {
           const picked = responded === emoji;
           const otherPicked = responded !== null && !picked;
           return (
@@ -453,7 +457,7 @@ function BossMessageCard({ text, responded, onRespond }: { text: string; respond
               key={emoji}
               onClick={() => onRespond(emoji)}
               disabled={responded !== null}
-              className={`rounded-full px-3 py-1 text-lg transition-all active:scale-90 ${
+              className={`rounded-full px-3 py-1 text-sm font-medium transition-all active:scale-90 ${
                 picked
                   ? "bg-brand text-brand-cream ring-2 ring-brand-honey"
                   : otherPicked
@@ -461,7 +465,7 @@ function BossMessageCard({ text, responded, onRespond }: { text: string; respond
                     : "bg-white/90 shadow-sm"
               }`}
             >
-              {emoji}
+              {`${emoji} ${label}`}
             </button>
           );
         })}

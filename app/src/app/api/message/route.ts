@@ -39,6 +39,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
+  // BYPASS: feat/boss-messages preview convenience. Remove before merging.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") {
+    return NextResponse.json({ ok: true, preview: true });
+  }
+
   await appendMessageResponse({
     employee,
     message_text,

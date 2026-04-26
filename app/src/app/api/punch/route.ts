@@ -30,6 +30,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
     }
 
+    // BYPASS: feat/boss-messages preview convenience. Remove before merging.
+    // Skip the write in preview so the manager can spam in/out + supplement
+    // buttons without polluting the sheet. Overtime + admin still write.
+    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") {
+      return NextResponse.json({ ok: true, employee, server_ts: nowTaipei(), preview: true });
+    }
+
     const effectiveSource = source === "supplement" ? "supplement" : "pwa";
     const punch: Punch = {
       employee,
