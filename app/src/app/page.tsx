@@ -87,6 +87,8 @@ export default function Home() {
   const [bossMessage, setBossMessage] = useState<string | null>(null);
   const [bossResponded, setBossResponded] = useState<string | null>(null);
   const [showBossArea, setShowBossArea] = useState(false);
+  const [countdownMs, setCountdownMs] = useState(0);
+  const [countdownKey, setCountdownKey] = useState(0);
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,6 +100,7 @@ export default function Home() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
     setPendingMessage(null); setBossMessage(null); setBossResponded(null); setShowBossArea(false);
+    setCountdownMs(0);
   }
 
   async function prefetchBossMessage() {
@@ -138,6 +141,8 @@ export default function Home() {
     setView("success");
     if (successTimer.current) clearTimeout(successTimer.current);
     const delay = msgToShow ? 5000 : 2500;
+    setCountdownMs(delay);
+    setCountdownKey((k) => k + 1);
     successTimer.current = setTimeout(resetToPin, delay);
   }
 
@@ -148,9 +153,12 @@ export default function Home() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ employee, message_text: bossMessage, response: emoji }),
     }).catch(() => {});
-    // Quick exit on response — task is done, no need to wait out the 5s window.
+    // Quick exit on response — long enough that the picked emoji is visibly confirmed.
     if (successTimer.current) clearTimeout(successTimer.current);
-    successTimer.current = setTimeout(resetToPin, 700);
+    const delay = 1200;
+    setCountdownMs(delay);
+    setCountdownKey((k) => k + 1);
+    successTimer.current = setTimeout(resetToPin, delay);
   }
 
   /** Brief success flash, then return to punch view (stay logged in) */
@@ -429,6 +437,12 @@ export default function Home() {
                 /* Fallback when messages tab is empty / prefetch failed: subtle static line */
                 <p className="mt-2 text-sm text-brand-soft/60">今天也辛苦了 🐝</p>
               )
+            )}
+
+            {countdownMs > 0 && (
+              <div className="countdown-track mt-2 w-full" aria-hidden="true">
+                <div key={countdownKey} className="countdown-fill" style={{ animationDuration: `${countdownMs}ms` }} />
+              </div>
             )}
           </div>
         )}

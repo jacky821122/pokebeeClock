@@ -75,4 +75,27 @@
     border-color: rgb(168 118 62 / 0.75);
     box-shadow: 0 0 0 4px rgb(246 207 122 / 0.25);
   }
+
+  .countdown-track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    border-radius: 9999px;
+    background: rgb(245 235 220 / 0.7);
+    overflow: hidden;
+  }
+
+  .countdown-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #f6cf7a 0%, #a8763e 100%);
+    animation: countdown-drain linear forwards;
+    transform-origin: left center;
+  }
+}
+
+@keyframes countdown-drain {
+  from { width: 100%; }
+  to { width: 0%; }
 }
