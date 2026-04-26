@@ -155,10 +155,8 @@ export default function Home() {
     }).catch(() => {});
     // Quick exit on response — long enough that the picked emoji is visibly confirmed.
     if (successTimer.current) clearTimeout(successTimer.current);
-    const delay = 1200;
-    setCountdownMs(delay);
-    setCountdownKey((k) => k + 1);
-    successTimer.current = setTimeout(resetToPin, delay);
+    setCountdownMs(0);
+    successTimer.current = setTimeout(resetToPin, 1200);
   }
 
   /** Brief success flash, then return to punch view (stay logged in) */
