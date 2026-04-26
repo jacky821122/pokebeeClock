@@ -1,53 +1,70 @@
-# Branch Review — Boss Messages UX
+# Branch Review — Boss Messages（功能 / 視覺導向）
 
-## Scope
-Reviewed commits from `a8b0a95` through `3edebb6`, focused on:
-- `app/src/app/page.tsx`
-- `app/src/app/api/message/route.ts`
-- `app/src/app/api/punch/route.ts`
-- `app/src/app/globals.css`
+## 這次重看後的結論（目前狀態）
+**建議：可上線，但要先完成 1 個上線前處理。**
 
-## What this feature adds
-- Shows a weighted "boss message" on success screen after punch in/out.
-- Adds response buttons (`❤️ 收到`, `🙏 謝謝`, `🤔 嗯…`) and records response.
-- Prefetches message during punch view to reduce success-screen latency.
-- Adds countdown bar and longer dwell time (5s) when message exists.
-- Supports weighted "no message" outcome via sentinel row `text=NONE`.
+- 功能面整體是加分：打卡成功後的「老闆的話」有情境感，使用者會更有被回應感。
+- 視覺面整體一致：色系、圓角、按鈕語氣與既有品牌風格一致，沒有突兀的新元件。
+- 互動節奏可接受：有訊息時停留 5 秒 + 倒數條，按下回應後 1.2 秒離開，節奏清楚。
+- **上線前處理（必要）**：確認 production 環境絕對不會啟用 `NEXT_PUBLIC_BYPASS_AUTH=1`；否則看起來流程成功，但資料可能不落地。
 
-## Launch recommendation
-**Recommendation: Not ready for production yet (ship after one blocker fix).**
+---
 
-### Blocker
-1. **Preview bypass still active in production paths**
-   - `POST /api/punch` skips sheet writes when `NEXT_PUBLIC_BYPASS_AUTH=1`.
-   - `POST /api/message` skips response appends under same env.
-   - Because this env var is `NEXT_PUBLIC_*`, it is easy to leak into builds or misconfigure across environments. If enabled by mistake, production appears healthy while silently dropping operational records (attendance + responses).
+## 使用者體驗視角（而非純程式）
 
-### Medium-risk observations
-2. **Potential state update after unmount in prefetch flow**
-   - `prefetchBossMessage()` attaches `p.then((text) => setPendingMessage(text));` without cancellation guard.
-   - If the component unmounts before promise resolution, React can warn about state updates on unmounted component (depending on timing/runtime mode).
+### 1) 打卡成功當下的感受
+- 現在不是只出現「成功」文字，而是多一層可回應的內容（老闆訊息 + emoji 回應），對第一線員工更有「被看見」感。
+- 透過登入後預抓訊息（prefetch），大多數情況成功頁能直接看到訊息，不會卡頓等載入。
 
-3. **No timeout/abort for `/api/message` prefetch itself**
-   - UI is protected via `Promise.race(..., 2000)` before showing success, which is good.
-   - But the fetch request keeps running in background; repeated network issues could create unnecessary in-flight requests.
+### 2) 視覺層次與資訊負擔
+- 成功 icon + 成功文案仍是主體，老闆卡片為次層，視覺權重合理。
+- 倒數條在有訊息時才顯示，避免平常狀態過度動畫化，這點是好的。
+- 回應按鈕由單 emoji 改成「emoji + 文案」，可讀性對不熟悉 emoji 的使用者更友善。
 
-## Suggested fixes before rollout
-1. Remove or hard-disable bypass logic in both endpoints before merge.
-2. If preview behavior must remain, gate it with server-only env (e.g. `BYPASS_AUTH_PREVIEW`) and additionally require non-production `NODE_ENV`.
-3. Add unmount-safe guard for async prefetch state updates (`aborted` flag or `AbortController`).
-4. Optional: add a small integration test for `text=NONE` semantics and bypass-disabled write behavior.
+### 3) 互動節奏
+- 有訊息：5 秒停留，給足夠時間閱讀與按回應。
+- 無訊息：2.5 秒離開，維持打卡機器的流量效率。
+- 已回應：1.2 秒快速離開，避免成功頁停太久造成隊伍堆積。
 
-## Value assessment
-**Yes, this feature is worth launching after the blocker fix.**
-- Clear UX improvement: contextual messaging + explicit acknowledgment.
-- Faster perceived performance from prefetching.
-- Better operator control through weighted no-message sentinel.
+---
 
-## Rollout plan (suggested)
-1. Patch bypass removal.
-2. Smoke test real punch write + message response append in staging.
-3. Monitor first day metrics:
-   - punch success vs sheet row count parity
-   - response append rate
-   - median success-screen dwell time
+## 值不值得上線？
+**值得。**
+
+原因（產品角度）：
+1. 幾乎不改變主要工作流（仍是一鍵打卡）但能提高情感回饋。
+2. 操作成本低（最多多點一次回應），卻能增加管理端觀測訊號。
+3. `NONE` 權重機制讓管理者可以控制「有時出現、有時不出現」而非硬開硬關。
+
+---
+
+## 上線前建議（功能/營運優先順序）
+
+### P0（必做）
+1. **部署檢查清單加入一條**：production 環境 `NEXT_PUBLIC_BYPASS_AUTH` 必須為非 `1`。
+2. staging 走一次真實流程：
+   - 打卡成功是否確實寫入。
+   - 回應是否確實寫入。
+   - `NONE` 權重是否可正確出現「不顯示訊息」。
+
+### P1（建議做）
+3. 針對高峰時段（多人連續打卡）做現場節奏測試：
+   - 有訊息比例若過高，可能使隊伍節奏略慢；可調整 `NONE` 權重。
+4. 在管理端加入最小觀測：
+   - 今日訊息曝光次數 / 回應率（只要日彙整即可）。
+
+### P2（可後續優化）
+5. 針對訊息過長加上 2 行截斷或字數建議，避免成功頁資訊過滿。
+6. 回應按鈕可加入更明確 selected 狀態文案（例如「已回覆」），提高可理解性。
+
+---
+
+## 風險與對策（非工程語言版）
+- 風險：若誤開 preview bypass，現場會「看起來成功、實際少資料」。
+- 對策：把部署前檢查列為 SOP，並在上線當天對「成功次數 vs 寫入筆數」做抽查。
+
+---
+
+## 最終建議
+這個功能**值得上線**，而且從現場體驗來看是正向改動；
+但請把「bypass 環境變數檢查 + staging 實測」當成上線閘門，完成後再推 production。
