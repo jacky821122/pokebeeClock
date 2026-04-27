@@ -4,6 +4,21 @@
 
 ---
 
+## Pre-merge checklist — `feat/boss-messages`
+
+> 開發中 branch 的清理項目。merge 前逐項打勾、整段刪掉。新 branch 開出來自己接著寫。
+
+- [ ] 移除 3 處 `// BYPASS: feat/boss-messages` 區塊：
+  - `app/src/lib/device.ts` — `checkDevice` 開頭
+  - `app/src/app/api/message/route.ts` — POST handler 寫入前
+  - `app/src/app/api/punch/route.ts` — POST handler 寫入前（preview 略過寫入）
+- [ ] `grep -rn "BYPASS" app/src/ docs/` 必須為空
+- [ ] Vercel 後台 Preview 環境變數 `NEXT_PUBLIC_BYPASS_AUTH=1` 可保留也可刪除（移除程式碼後沒有 path 會讀，留著無害但不乾淨）
+- [ ] `npm run -w app test` + `npx tsc --noEmit` 全綠
+- [ ] 把這個 request 從 #0 移到完成區（如果還沒做）
+
+---
+
 ## Requests（待辦 / 想法池）
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
