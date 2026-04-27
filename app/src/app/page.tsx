@@ -155,7 +155,18 @@ export default function Home() {
     if (msgToShow) {
       setCountdownMs(5000);
       setCountdownKey((k) => k + 1);
-      successTimer.current = setTimeout(resetToPin, 5000);
+      // No-response path: respondToBoss replaces this timer if the employee
+      // reacts, so reaching this callback means the message went unanswered.
+      const employeeAtShow = employee;
+      successTimer.current = setTimeout(() => {
+        if (employeeAtShow) {
+          apiFetch("/api/message", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ employee: employeeAtShow, message_text: msgToShow, response: "" }),
+          }).catch(() => {});
+        }
+        resetToPin();
+      }, 5000);
     } else {
       setCountdownMs(0);
       successTimer.current = setTimeout(resetToPin, 2500);

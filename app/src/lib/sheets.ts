@@ -10,14 +10,14 @@ const TAB_OVERTIME = "overtime_requests";
 const TAB_DEVICES = "devices";
 const TAB_MESSAGES = "messages";
 const TAB_MESSAGE_RESPONSES = "message_responses";
-const TAB_MESSAGE_IMPRESSIONS = "message_impressions";
 
-// employees:            name | pin | role | active
-// raw_punches:          employee | client_ts | server_ts | source | kind | device
-// devices:              label | token | active
-// messages:             text | active | weight | created_at
-// message_responses:    employee | message_text | response | timestamp
-// message_impressions:  employee | message_text | timestamp
+// employees:          name | pin | role | active
+// raw_punches:        employee | client_ts | server_ts | source | kind | device
+// devices:            label | token | active
+// messages:           text | active | weight | created_at
+// message_responses:  employee | message_text | response | timestamp
+//                     (response is "" when employee saw the message but
+//                     didn't react — one row per show)
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
@@ -631,35 +631,18 @@ export async function appendMessageResponse(input: MessageResponseInput): Promis
   });
 }
 
-export interface MessageImpressionInput {
-  employee: string;
-  message_text: string;
-  timestamp: string;
-}
-
-export async function appendMessageImpression(input: MessageImpressionInput): Promise<void> {
-  const sheets = getSheets();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sid(),
-    range: `${TAB_MESSAGE_IMPRESSIONS}!A:C`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [[input.employee, input.message_text, input.timestamp]],
-    },
-  });
-}
-
 /**
  * Recent distinct messages shown to a given employee, newest first. Used so
- * the picker can avoid repeating the same line back-to-back. Returns [] when
- * the tab is missing/empty.
+ * the picker can avoid repeating the same line back-to-back. Reads from
+ * `message_responses` (every show writes a row, with response="" if the
+ * employee didn't react). Returns [] when the tab is missing/empty.
  */
-export async function recentImpressionsForEmployee(employee: string, limit: number): Promise<string[]> {
+export async function recentShownMessagesForEmployee(employee: string, limit: number): Promise<string[]> {
   const sheets = getSheets();
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: sid(),
-      range: `${TAB_MESSAGE_IMPRESSIONS}!A:C`,
+      range: `${TAB_MESSAGE_RESPONSES}!A:D`,
     });
     const rows = res.data.values ?? [];
     const seen = new Set<string>();
@@ -718,28 +701,23 @@ export interface MessageStat {
 
 export async function getMessageStats(): Promise<MessageStat[]> {
   const sheets = getSheets();
-  const [messages, impressionsRes, responsesRes] = await Promise.all([
+  const [messages, responsesRes] = await Promise.all([
     getAllMessageRows(),
-    sheets.spreadsheets.values
-      .get({ spreadsheetId: sid(), range: `${TAB_MESSAGE_IMPRESSIONS}!A:C` })
-      .catch(() => ({ data: { values: [] as string[][] } })),
     sheets.spreadsheets.values
       .get({ spreadsheetId: sid(), range: `${TAB_MESSAGE_RESPONSES}!A:D` })
       .catch(() => ({ data: { values: [] as string[][] } })),
   ]);
 
+  // One row per show: total rows = impressions, rows with non-empty response
+  // = reactions broken out by emoji.
   const impCounts = new Map<string, number>();
-  for (const r of (impressionsRes.data.values ?? []).slice(1)) {
-    const text = String(r[1] ?? "");
-    if (!text) continue;
-    impCounts.set(text, (impCounts.get(text) ?? 0) + 1);
-  }
-
   const respCounts = new Map<string, Record<string, number>>();
   for (const r of (responsesRes.data.values ?? []).slice(1)) {
     const text = String(r[1] ?? "");
+    if (!text) continue;
+    impCounts.set(text, (impCounts.get(text) ?? 0) + 1);
     const emoji = String(r[2] ?? "");
-    if (!text || !emoji) continue;
+    if (!emoji) continue;
     const m = respCounts.get(text) ?? {};
     m[emoji] = (m[emoji] ?? 0) + 1;
     respCounts.set(text, m);

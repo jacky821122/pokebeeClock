@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getActiveMessages,
   appendMessageResponse,
-  appendMessageImpression,
-  recentImpressionsForEmployee,
+  recentShownMessagesForEmployee,
   type Message,
 } from "@/lib/sheets";
 import { checkDevice } from "@/lib/device";
@@ -31,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const [messages, recent] = await Promise.all([
     getActiveMessages(),
-    employee ? recentImpressionsForEmployee(employee, DEDUP_WINDOW) : Promise.resolve([] as string[]),
+    employee ? recentShownMessagesForEmployee(employee, DEDUP_WINDOW) : Promise.resolve([] as string[]),
   ]);
 
   // Dedup applies to real messages only — NONE may repeat freely.
@@ -50,18 +49,6 @@ export async function GET(req: NextRequest) {
   // "show no boss message" without the client inventing fallback behavior.
   const text = picked && picked.text !== "NONE" ? picked.text : null;
 
-  if (text && employee) {
-    try {
-      await appendMessageImpression({
-        employee,
-        message_text: text,
-        timestamp: nowTaipei(),
-      });
-    } catch (err) {
-      console.warn("appendMessageImpression failed", err);
-    }
-  }
-
   return NextResponse.json({ text });
 }
 
@@ -76,7 +63,8 @@ export async function POST(req: NextRequest) {
     response?: string;
   };
 
-  if (!employee || !message_text || !response) {
+  // response is allowed to be "" — that's the "shown but no reaction" signal.
+  if (!employee || !message_text || typeof response !== "string") {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
