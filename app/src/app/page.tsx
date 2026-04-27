@@ -470,8 +470,7 @@ const BOSS_RESPONSES: { emoji: string; label: string }[] = [
 function BossMessageCard({ text, responded, onRespond }: { text: string; responded: string | null; onRespond: (emoji: string) => void }) {
   return (
     <div className="mt-3 w-full rounded-2xl border border-brand-honey/40 bg-brand-honey/15 px-4 py-3 text-left">
-      <p className="text-xs font-semibold tracking-wide text-brand-soft/80">老闆的話</p>
-      <p className="mt-1 text-sm text-brand">{text}</p>
+      <p className="text-sm text-brand">{text}</p>
       <div className="mt-2 flex justify-end gap-2">
         {BOSS_RESPONSES.map(({ emoji, label }) => {
           const picked = responded === emoji;
