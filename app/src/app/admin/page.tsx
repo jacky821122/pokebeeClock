@@ -88,7 +88,104 @@ function AdminDashboard({ secret, onSignOut }: { secret: string; onSignOut: () =
       </div>
       <ReportDownload secret={secret} />
       <EmployeesTable secret={secret} />
+      <MessagesReport secret={secret} />
       <ReanalyzeAll secret={secret} />
+    </div>
+  );
+}
+
+interface MessageStat {
+  text: string;
+  active: boolean;
+  weight: number;
+  created_at: string;
+  impressions: number;
+  responses: Record<string, number>;
+}
+
+const RESPONSE_EMOJIS = ["❤️", "🙏", "🤔"];
+
+function MessagesReport({ secret }: { secret: string }) {
+  const [stats, setStats] = useState<MessageStat[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/messages-report", {
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? `失敗（${res.status}）`);
+        return;
+      }
+      setStats(data.stats ?? []);
+    } catch {
+      setError("網路錯誤");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="mt-10">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">訊息成效</h2>
+        <button
+          onClick={load}
+          disabled={loading}
+          className="rounded border border-brand-soft/40 px-3 py-1 text-sm disabled:opacity-40"
+        >
+          {loading ? "載入中…" : "重新整理"}
+        </button>
+      </div>
+      {error && <p className="mb-2 text-sm text-red-500">{error}</p>}
+      {stats && stats.length === 0 && (
+        <p className="text-sm text-brand-soft/50">尚無訊息資料。</p>
+      )}
+      {stats && stats.length > 0 && (
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-brand-sand text-left">
+              <th className="py-2 pr-3">訊息</th>
+              <th className="py-2 pr-3">啟用</th>
+              <th className="py-2 pr-3">權重</th>
+              <th className="py-2 pr-3">曝光</th>
+              {RESPONSE_EMOJIS.map((e) => (
+                <th key={e} className="py-2 pr-3">{e}</th>
+              ))}
+              <th className="py-2 pr-3">回覆率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map((s) => {
+              const total = Object.values(s.responses).reduce((a, b) => a + b, 0);
+              const rate = s.impressions > 0 ? (total / s.impressions) * 100 : 0;
+              return (
+                <tr key={s.text} className="border-b border-brand-sand/50 align-top">
+                  <td className="py-2 pr-3 max-w-md break-words">
+                    {s.text === "NONE" ? <span className="text-brand-soft/60">（不顯示）</span> : s.text}
+                  </td>
+                  <td className="py-2 pr-3">{s.active ? "✓" : "—"}</td>
+                  <td className="py-2 pr-3">{s.weight}</td>
+                  <td className="py-2 pr-3">{s.impressions}</td>
+                  {RESPONSE_EMOJIS.map((e) => (
+                    <td key={e} className="py-2 pr-3">{s.responses[e] ?? 0}</td>
+                  ))}
+                  <td className="py-2 pr-3">
+                    {s.impressions > 0 ? `${rate.toFixed(0)}%` : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

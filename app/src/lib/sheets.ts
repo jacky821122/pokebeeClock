@@ -10,12 +10,14 @@ const TAB_OVERTIME = "overtime_requests";
 const TAB_DEVICES = "devices";
 const TAB_MESSAGES = "messages";
 const TAB_MESSAGE_RESPONSES = "message_responses";
+const TAB_MESSAGE_IMPRESSIONS = "message_impressions";
 
-// employees:          name | pin | role | active
-// raw_punches:        employee | client_ts | server_ts | source | kind | device
-// devices:            label | token | active
-// messages:           text | active | weight | created_at
-// message_responses:  employee | message_text | response | timestamp
+// employees:            name | pin | role | active
+// raw_punches:          employee | client_ts | server_ts | source | kind | device
+// devices:              label | token | active
+// messages:             text | active | weight | created_at
+// message_responses:    employee | message_text | response | timestamp
+// message_impressions:  employee | message_text | timestamp
 // analyzed_YYYY-MM: employee | date | shift | in_raw | in_norm | out_raw | out_norm | normal_hours | overtime_hours | note
 //
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
@@ -627,6 +629,130 @@ export async function appendMessageResponse(input: MessageResponseInput): Promis
       values: [[input.employee, input.message_text, input.response, input.timestamp]],
     },
   });
+}
+
+export interface MessageImpressionInput {
+  employee: string;
+  message_text: string;
+  timestamp: string;
+}
+
+export async function appendMessageImpression(input: MessageImpressionInput): Promise<void> {
+  const sheets = getSheets();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: sid(),
+    range: `${TAB_MESSAGE_IMPRESSIONS}!A:C`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[input.employee, input.message_text, input.timestamp]],
+    },
+  });
+}
+
+/**
+ * Recent distinct messages shown to a given employee, newest first. Used so
+ * the picker can avoid repeating the same line back-to-back. Returns [] when
+ * the tab is missing/empty.
+ */
+export async function recentImpressionsForEmployee(employee: string, limit: number): Promise<string[]> {
+  const sheets = getSheets();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${TAB_MESSAGE_IMPRESSIONS}!A:C`,
+    });
+    const rows = res.data.values ?? [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (let i = rows.length - 1; i >= 1 && out.length < limit; i--) {
+      const r = rows[i];
+      if ((r[0] ?? "") !== employee) continue;
+      const text = String(r[1] ?? "");
+      if (!text || seen.has(text)) continue;
+      seen.add(text);
+      out.push(text);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export interface MessageRow {
+  text: string;
+  active: boolean;
+  weight: number;
+  created_at: string;
+}
+
+export async function getAllMessageRows(): Promise<MessageRow[]> {
+  const sheets = getSheets();
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${TAB_MESSAGES}!A:D`,
+    });
+    const rows = res.data.values ?? [];
+    return rows
+      .slice(1)
+      .filter((r) => r[0])
+      .map((r) => ({
+        text: String(r[0]),
+        active: r[1]?.toString().toUpperCase() === "TRUE",
+        weight: Number(r[2] ?? 1) || 1,
+        created_at: String(r[3] ?? ""),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export interface MessageStat {
+  text: string;
+  active: boolean;
+  weight: number;
+  created_at: string;
+  impressions: number;
+  responses: Record<string, number>;
+}
+
+export async function getMessageStats(): Promise<MessageStat[]> {
+  const sheets = getSheets();
+  const [messages, impressionsRes, responsesRes] = await Promise.all([
+    getAllMessageRows(),
+    sheets.spreadsheets.values
+      .get({ spreadsheetId: sid(), range: `${TAB_MESSAGE_IMPRESSIONS}!A:C` })
+      .catch(() => ({ data: { values: [] as string[][] } })),
+    sheets.spreadsheets.values
+      .get({ spreadsheetId: sid(), range: `${TAB_MESSAGE_RESPONSES}!A:D` })
+      .catch(() => ({ data: { values: [] as string[][] } })),
+  ]);
+
+  const impCounts = new Map<string, number>();
+  for (const r of (impressionsRes.data.values ?? []).slice(1)) {
+    const text = String(r[1] ?? "");
+    if (!text) continue;
+    impCounts.set(text, (impCounts.get(text) ?? 0) + 1);
+  }
+
+  const respCounts = new Map<string, Record<string, number>>();
+  for (const r of (responsesRes.data.values ?? []).slice(1)) {
+    const text = String(r[1] ?? "");
+    const emoji = String(r[2] ?? "");
+    if (!text || !emoji) continue;
+    const m = respCounts.get(text) ?? {};
+    m[emoji] = (m[emoji] ?? 0) + 1;
+    respCounts.set(text, m);
+  }
+
+  return messages.map((m) => ({
+    text: m.text,
+    active: m.active,
+    weight: m.weight,
+    created_at: m.created_at,
+    impressions: impCounts.get(m.text) ?? 0,
+    responses: respCounts.get(m.text) ?? {},
+  }));
 }
 
 // ── overtime delete ──────────────────────────────────────────────────────────

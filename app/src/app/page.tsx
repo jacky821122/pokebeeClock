@@ -104,10 +104,10 @@ export default function Home() {
     prefetchPromise.current = null;
   }
 
-  function prefetchBossMessage() {
+  function prefetchBossMessage(employeeName: string) {
     prefetchPromise.current = (async () => {
       try {
-        const res = await apiFetch("/api/message");
+        const res = await apiFetch(`/api/message?employee=${encodeURIComponent(employeeName)}`);
         if (!res.ok) return null;
         const data = await res.json();
         return (data.text as string | null) ?? null;
@@ -139,7 +139,7 @@ export default function Home() {
       setMissingPunches(data.missing_punches ?? []);
       setCustomTs(nowTaipeiLocal()); setSupDate(todayTaipei()); setOtDate(todayTaipei());
       setView("punch");
-      prefetchBossMessage();
+      prefetchBossMessage(data.employee);
     } catch { setError("網路錯誤，請再試一次"); setPinKey((k) => k + 1); }
     finally { setLoading(false); }
   }
