@@ -1,27 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findEmployeeByPin, getLastPunchKind, getMissingPunches } from "@/lib/sheets";
-import { checkDevice } from "@/lib/device";
+import { loadIdentifyContext } from "@/lib/sheets";
 import { currentYyyyMm } from "@/lib/time";
 import type { PunchKind } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
-    const dev = await checkDevice(req);
-    if (!dev.ok) return dev.res;
-
-    const { pin } = await req.json() as { pin: string };
+    const { pin } = (await req.json()) as { pin: string };
     if (!pin) return NextResponse.json({ error: "Missing pin" }, { status: 400 });
 
-    const employee = await findEmployeeByPin(pin);
-    if (!employee) return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
+    const token = req.headers.get("x-device-token") ?? "";
+    const ctx = await loadIdentifyContext(pin, currentYyyyMm(), token);
 
-    const [lastKind, missingPunches] = await Promise.all([
-      getLastPunchKind(employee),
-      getMissingPunches(employee, currentYyyyMm()),
-    ]);
-    const suggested: PunchKind = lastKind === "in" ? "out" : "in";
+    if (ctx.deviceLabel === null) {
+      return NextResponse.json(
+        { error: "裝置未授權", code: "device_invalid" },
+        { status: 401 },
+      );
+    }
+    if (!ctx.employee) {
+      return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
+    }
 
-    return NextResponse.json({ employee, suggested_kind: suggested, missing_punches: missingPunches });
+    const suggested: PunchKind = ctx.lastKind === "in" ? "out" : "in";
+    return NextResponse.json({
+      employee: ctx.employee,
+      suggested_kind: suggested,
+      missing_punches: ctx.missingPunches,
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "識別失敗" }, { status: 500 });
