@@ -65,6 +65,42 @@ function sid() {
   return id;
 }
 
+// ── TTL cache for slow-changing tabs ─────────────────────────────────────────
+//
+// employees + devices change rarely (admin-driven for employees, manual sheet
+// edit for devices). Cache the raw rows for a few minutes to skip Sheets reads
+// on the hot PIN-entry path. Survives within a warm Vercel container.
+
+const EMPLOYEES_TTL_MS = 5 * 60 * 1000;
+const DEVICES_TTL_MS = 5 * 60 * 1000;
+
+let employeesCache: { rows: string[][]; expiresAt: number } | null = null;
+let devicesCache: { rows: string[][]; expiresAt: number } | null = null;
+
+export function invalidateEmployeesCache() {
+  employeesCache = null;
+}
+
+export function invalidateDevicesCache() {
+  devicesCache = null;
+}
+
+function employeesFresh() {
+  return employeesCache && employeesCache.expiresAt > Date.now() ? employeesCache.rows : null;
+}
+
+function devicesFresh() {
+  return devicesCache && devicesCache.expiresAt > Date.now() ? devicesCache.rows : null;
+}
+
+function setEmployeesCache(rows: string[][]) {
+  employeesCache = { rows, expiresAt: Date.now() + EMPLOYEES_TTL_MS };
+}
+
+function setDevicesCache(rows: string[][]) {
+  devicesCache = { rows, expiresAt: Date.now() + DEVICES_TTL_MS };
+}
+
 // ── employees ────────────────────────────────────────────────────────────────
 
 export async function getActiveEmployees(): Promise<Employee[]> {
@@ -154,6 +190,7 @@ export async function addEmployee(name: string, pin: string, role: "full_time" |
     valueInputOption: "RAW",
     requestBody: { values: [[name, pin, role, "TRUE"]] },
   });
+  invalidateEmployeesCache();
 }
 
 /**
@@ -187,6 +224,7 @@ export async function updateEmployee(
     valueInputOption: "RAW",
     requestBody: { values: [[name, nextPin, nextRole, nextActive]] },
   });
+  invalidateEmployeesCache();
 }
 
 // ── raw_punches ──────────────────────────────────────────────────────────────
@@ -486,27 +524,42 @@ export async function loadIdentifyContext(
   const sheets = getSheets();
   const analyzedTab = `analyzed_${yyyyMm}`;
 
-  // Issue both requests in parallel. The analyzed tab may not exist yet — keep
-  // it as a separate get so a 400 there doesn't fail the whole batch.
+  // Use cached employees + devices when fresh; only fetch what's missing in
+  // the batch. raw_punches and analyzed always come from Sheets.
+  const cachedEmployees = employeesFresh();
+  const cachedDevices = devicesFresh();
+  const ranges: string[] = [];
+  if (!cachedDevices) ranges.push(`${TAB_DEVICES}!A:C`);
+  if (!cachedEmployees) ranges.push(`${TAB_EMPLOYEES}!A:D`);
+  ranges.push(`${TAB_PUNCHES}!A:E`);
+
+  // The analyzed tab may not exist yet — keep it as a separate get so a 400
+  // there doesn't fail the whole batch.
   const [batchRes, analyzedRows] = await Promise.all([
-    sheets.spreadsheets.values.batchGet({
-      spreadsheetId: sid(),
-      ranges: [
-        `${TAB_DEVICES}!A:C`,
-        `${TAB_EMPLOYEES}!A:D`,
-        `${TAB_PUNCHES}!A:E`,
-      ],
-    }),
+    sheets.spreadsheets.values.batchGet({ spreadsheetId: sid(), ranges }),
     sheets.spreadsheets.values
       .get({ spreadsheetId: sid(), range: `${analyzedTab}!A:J` })
-      .then((r) => r.data.values ?? [])
+      .then((r) => (r.data.values ?? []) as string[][])
       .catch(() => [] as string[][]),
   ]);
 
-  const ranges = batchRes.data.valueRanges ?? [];
-  const devicesRows = (ranges[0]?.values ?? []) as string[][];
-  const employeesRows = (ranges[1]?.values ?? []) as string[][];
-  const punchesRows = (ranges[2]?.values ?? []) as string[][];
+  const valueRanges = batchRes.data.valueRanges ?? [];
+  let cursor = 0;
+  let devicesRows: string[][];
+  if (cachedDevices) {
+    devicesRows = cachedDevices;
+  } else {
+    devicesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
+    setDevicesCache(devicesRows);
+  }
+  let employeesRows: string[][];
+  if (cachedEmployees) {
+    employeesRows = cachedEmployees;
+  } else {
+    employeesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
+    setEmployeesCache(employeesRows);
+  }
+  const punchesRows = (valueRanges[cursor]?.values ?? []) as string[][];
 
   // Device check
   const activeDevices = devicesRows
