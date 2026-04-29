@@ -65,8 +65,11 @@ export default function Home() {
   const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState("");
   const [employee, setEmployee] = useState<string | null>(null);
-  const [suggested, setSuggested] = useState<PunchKind>("in");
+  const [suggested, setSuggested] = useState<PunchKind | null>(null);
   const [missingPunches, setMissingPunches] = useState<MissingPunch[]>([]);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [identifyTimings, setIdentifyTimings] = useState<Record<string, number> | null>(null);
+  const [statusTimings, setStatusTimings] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinKey, setPinKey] = useState(0);
@@ -90,22 +93,43 @@ export default function Home() {
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
+    setSuggested(null); setStatusLoading(false);
+    setIdentifyTimings(null); setStatusTimings(null);
+  }
+
+  async function fetchStatus(enteredPin: string) {
+    setStatusLoading(true);
+    try {
+      const res = await apiFetch("/api/employee_status", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: enteredPin }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuggested(data.suggested_kind ?? null);
+        setMissingPunches(data.missing_punches ?? []);
+        setStatusTimings(data.timings ?? null);
+      }
+    } catch { /* silent — suggestion stays neutral, missing area shows empty */ }
+    finally { setStatusLoading(false); }
   }
 
   async function handlePin(enteredPin: string) {
     setLoading(true); setError(null);
+    setSuggested(null); setMissingPunches([]); setStatusTimings(null);
     try {
       const res = await apiFetch("/api/identify", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin: enteredPin }),
       });
       const data = await res.json();
+      setIdentifyTimings(data.timings ?? null);
       if (!res.ok) { setError(data.error ?? "PIN 不正確"); setPinKey((k) => k + 1); return; }
       setPin(enteredPin); setEmployee(data.employee);
-      setSuggested(data.suggested_kind ?? "in");
-      setMissingPunches(data.missing_punches ?? []);
       setCustomTs(nowTaipeiLocal()); setSupDate(todayTaipei()); setOtDate(todayTaipei());
       setView("punch");
+      // kick off slow-path status load in background
+      fetchStatus(enteredPin);
     } catch { setError("網路錯誤，請再試一次"); setPinKey((k) => k + 1); }
     finally { setLoading(false); }
   }
@@ -215,7 +239,11 @@ export default function Home() {
             <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
-            {missingPunches.length > 0 && (
+            {statusLoading && missingPunches.length === 0 ? (
+              <div className="w-full max-w-sm rounded-2xl border border-brand-honey/20 bg-white/70 p-4 text-sm text-brand-soft/60 shadow-sm lg:max-w-md lg:p-5">
+                載入缺卡紀錄中⋯
+              </div>
+            ) : missingPunches.length > 0 ? (
               <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50/95 p-4 shadow-sm lg:max-w-md lg:p-5">
                 <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
                 {missingPunches.map((mp, i) => (
@@ -229,7 +257,7 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
 
             {process.env.NODE_ENV === "development" && (
               <div className="w-full max-w-sm lg:max-w-md">
@@ -243,6 +271,8 @@ export default function Home() {
               <DirectionButton label="上班" emoji="🟢" suggested={suggested === "in"} onClick={() => handlePunch("in")} />
               <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
             </div>
+
+            <TimingsPanel identify={identifyTimings} status={statusTimings} statusLoading={statusLoading} />
 
             <div className="flex w-full max-w-sm gap-3 pt-2 lg:max-w-md lg:gap-4">
               <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
@@ -400,6 +430,31 @@ function DirectionButton({ label, emoji, suggested, onClick }: { label: string; 
       <span>{emoji}</span><span>{label}</span>
       {suggested && <span className="rounded-full bg-brand-honey/20 px-2 py-0.5 text-xs font-normal opacity-90 lg:text-sm">建議</span>}
     </button>
+  );
+}
+
+function TimingsPanel({
+  identify,
+  status,
+  statusLoading,
+}: {
+  identify: Record<string, number> | null;
+  status: Record<string, number> | null;
+  statusLoading: boolean;
+}) {
+  if (!identify && !status && !statusLoading) return null;
+  const fmt = (m: Record<string, number> | null) =>
+    m ? Object.entries(m).map(([k, v]) => `${k}=${v}`).join(" ") : "—";
+  return (
+    <details className="w-full max-w-sm rounded-xl border border-brand-honey/20 bg-white/70 px-3 py-2 text-xs text-brand-soft/80 lg:max-w-md" open>
+      <summary className="cursor-pointer select-none font-mono">⏱ timings (ms)</summary>
+      <div className="mt-1 space-y-0.5 font-mono">
+        <div>identify: {fmt(identify)}</div>
+        <div>
+          status: {statusLoading ? "loading…" : fmt(status)}
+        </div>
+      </div>
+    </details>
   );
 }
 

@@ -499,69 +499,60 @@ export async function getMissingPunches(employee: string, yyyyMm: string): Promi
   }
 }
 
-// ── identify (combined fast-path) ────────────────────────────────────────────
-
-export interface IdentifyContext {
-  /** matched device label, "" if enforcement disabled, null if token invalid */
-  deviceLabel: string | null;
-  employee: string | null;
-  lastKind: "in" | "out" | null;
-  missingPunches: MissingPunch[];
-}
+// ── identify (split fast/slow paths) ─────────────────────────────────────────
 
 /**
- * Single-roundtrip read for the PIN-entry flow.
- *
- * Combines devices, employees, raw_punches, and the current month's analyzed
- * tab into one batchGet call (plus a parallel fallback for when the analyzed
- * tab does not yet exist), replacing 4 sequential Sheets reads.
+ * Fast-path PIN → employee lookup. Uses the cached employees rows when fresh,
+ * otherwise pulls just employees + devices. Does NOT touch raw_punches or
+ * analyzed_*. Returns timings for instrumentation.
  */
-export async function loadIdentifyContext(
+export async function findEmployeeByPinFast(
   pin: string,
-  yyyyMm: string,
   deviceToken: string,
-): Promise<IdentifyContext> {
-  const sheets = getSheets();
-  const analyzedTab = `analyzed_${yyyyMm}`;
+): Promise<{
+  deviceLabel: string | null;
+  employee: string | null;
+  timings: Record<string, number>;
+}> {
+  const t: Record<string, number> = {};
+  const t0 = Date.now();
 
-  // Use cached employees + devices when fresh; only fetch what's missing in
-  // the batch. raw_punches and analyzed always come from Sheets.
   const cachedEmployees = employeesFresh();
   const cachedDevices = devicesFresh();
-  const ranges: string[] = [];
-  if (!cachedDevices) ranges.push(`${TAB_DEVICES}!A:C`);
-  if (!cachedEmployees) ranges.push(`${TAB_EMPLOYEES}!A:D`);
-  ranges.push(`${TAB_PUNCHES}!A:E`);
-
-  // The analyzed tab may not exist yet — keep it as a separate get so a 400
-  // there doesn't fail the whole batch.
-  const [batchRes, analyzedRows] = await Promise.all([
-    sheets.spreadsheets.values.batchGet({ spreadsheetId: sid(), ranges }),
-    sheets.spreadsheets.values
-      .get({ spreadsheetId: sid(), range: `${analyzedTab}!A:J` })
-      .then((r) => (r.data.values ?? []) as string[][])
-      .catch(() => [] as string[][]),
-  ]);
-
-  const valueRanges = batchRes.data.valueRanges ?? [];
-  let cursor = 0;
+  let employeesRows: string[][];
   let devicesRows: string[][];
-  if (cachedDevices) {
+
+  if (cachedEmployees && cachedDevices) {
+    t.cache_hit = 1;
+    employeesRows = cachedEmployees;
     devicesRows = cachedDevices;
   } else {
-    devicesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
-    setDevicesCache(devicesRows);
+    const sheets = getSheets();
+    const ranges: string[] = [];
+    if (!cachedDevices) ranges.push(`${TAB_DEVICES}!A:C`);
+    if (!cachedEmployees) ranges.push(`${TAB_EMPLOYEES}!A:D`);
+    const tFetch = Date.now();
+    const res = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: sid(),
+      ranges,
+    });
+    t.sheets_fast = Date.now() - tFetch;
+    const valueRanges = res.data.valueRanges ?? [];
+    let cursor = 0;
+    if (cachedDevices) {
+      devicesRows = cachedDevices;
+    } else {
+      devicesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
+      setDevicesCache(devicesRows);
+    }
+    if (cachedEmployees) {
+      employeesRows = cachedEmployees;
+    } else {
+      employeesRows = (valueRanges[cursor]?.values ?? []) as string[][];
+      setEmployeesCache(employeesRows);
+    }
   }
-  let employeesRows: string[][];
-  if (cachedEmployees) {
-    employeesRows = cachedEmployees;
-  } else {
-    employeesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
-    setEmployeesCache(employeesRows);
-  }
-  const punchesRows = (valueRanges[cursor]?.values ?? []) as string[][];
 
-  // Device check
   const activeDevices = devicesRows
     .slice(1)
     .filter((r) => r[1] && r[2]?.toString().toUpperCase() === "TRUE");
@@ -571,7 +562,6 @@ export async function loadIdentifyContext(
     deviceLabel = dev ? String(dev[0] ?? "") : null;
   }
 
-  // PIN → employee
   const empRow = employeesRows
     .slice(1)
     .find(
@@ -579,14 +569,52 @@ export async function loadIdentifyContext(
     );
   const employee = empRow ? String(empRow[0]) : null;
 
-  if (!employee) {
-    return { deviceLabel, employee: null, lastKind: null, missingPunches: [] };
-  }
+  t.total = Date.now() - t0;
+  return { deviceLabel, employee, timings: t };
+}
 
-  // Last punch kind
+/**
+ * Slow-path: loads lastKind + missingPunches for an employee, requiring two
+ * Sheets reads (raw_punches + analyzed_YYYY-MM). Run in the background after
+ * the user has already moved past the PIN screen.
+ */
+export async function loadEmployeeStatus(
+  employee: string,
+  yyyyMm: string,
+): Promise<{
+  lastKind: "in" | "out" | null;
+  missingPunches: MissingPunch[];
+  timings: Record<string, number>;
+}> {
+  const t: Record<string, number> = {};
+  const t0 = Date.now();
+  const sheets = getSheets();
+  const analyzedTab = `analyzed_${yyyyMm}`;
+
+  const tPunches = Date.now();
+  const tAnalyzed = Date.now();
+  const [punchesRes, analyzedRows] = await Promise.all([
+    sheets.spreadsheets.values
+      .get({ spreadsheetId: sid(), range: `${TAB_PUNCHES}!A:E` })
+      .then((r) => {
+        t.sheets_punches = Date.now() - tPunches;
+        return (r.data.values ?? []) as string[][];
+      }),
+    sheets.spreadsheets.values
+      .get({ spreadsheetId: sid(), range: `${analyzedTab}!A:J` })
+      .then((r) => {
+        t.sheets_analyzed = Date.now() - tAnalyzed;
+        return (r.data.values ?? []) as string[][];
+      })
+      .catch(() => {
+        t.sheets_analyzed = Date.now() - tAnalyzed;
+        return [] as string[][];
+      }),
+  ]);
+
   let latestTs = "";
   let lastKind: "in" | "out" | null = null;
-  for (const r of punchesRows.slice(1)) {
+  for (const r of punchesRes.slice(1)) {
     if (r[0] !== employee) continue;
     const ts = String(r[1] ?? "");
     if (ts <= latestTs) continue;
@@ -596,7 +624,6 @@ export async function loadIdentifyContext(
     lastKind = kind;
   }
 
-  // Missing punches (current month, past dates only)
   const now = new Date();
   const today = new Date(now.getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10);
   const missingPunches: MissingPunch[] = [];
@@ -616,7 +643,8 @@ export async function loadIdentifyContext(
     }
   }
 
-  return { deviceLabel, employee, lastKind, missingPunches };
+  t.total = Date.now() - t0;
+  return { lastKind, missingPunches, timings: t };
 }
 
 // ── devices ──────────────────────────────────────────────────────────────────
