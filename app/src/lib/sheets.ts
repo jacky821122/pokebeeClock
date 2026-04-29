@@ -17,11 +17,17 @@ const TAB_DEVICES = "devices";
 // `kind` is "in" | "out" (added 2026-04-19). Legacy rows without kind are
 // handled by punchesToEvents via alternating fallback.
 
-function getAuth() {
+let cachedAuth: InstanceType<typeof google.auth.GoogleAuth> | null = null;
+
+function getAuth(): InstanceType<typeof google.auth.GoogleAuth> {
+  if (cachedAuth) return cachedAuth;
   const sa = process.env.GOOGLE_SA_JSON;
   if (!sa) throw new Error("GOOGLE_SA_JSON not set");
-  return new google.auth.GoogleAuth({ credentials: JSON.parse(sa), scopes: SCOPES });
+  cachedAuth = new google.auth.GoogleAuth({ credentials: JSON.parse(sa), scopes: SCOPES });
+  return cachedAuth;
 }
+
+let cachedSheetsClient: ReturnType<typeof google.sheets> | null = null;
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
@@ -42,7 +48,10 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 function getSheets() {
-  return google.sheets({ version: "v4", auth: getAuth() });
+  if (!cachedSheetsClient) {
+    cachedSheetsClient = google.sheets({ version: "v4", auth: getAuth() });
+  }
+  return cachedSheetsClient;
 }
 
 /** Wrap an async call with retry for transient Google API errors (429/5xx). */
@@ -54,6 +63,42 @@ function sid() {
   const id = process.env.SHEET_ID;
   if (!id) throw new Error("SHEET_ID not set");
   return id;
+}
+
+// ── TTL cache for slow-changing tabs ─────────────────────────────────────────
+//
+// employees + devices change rarely (admin-driven for employees, manual sheet
+// edit for devices). Cache the raw rows for a few minutes to skip Sheets reads
+// on the hot PIN-entry path. Survives within a warm Vercel container.
+
+const EMPLOYEES_TTL_MS = 5 * 60 * 1000;
+const DEVICES_TTL_MS = 5 * 60 * 1000;
+
+let employeesCache: { rows: string[][]; expiresAt: number } | null = null;
+let devicesCache: { rows: string[][]; expiresAt: number } | null = null;
+
+export function invalidateEmployeesCache() {
+  employeesCache = null;
+}
+
+export function invalidateDevicesCache() {
+  devicesCache = null;
+}
+
+function employeesFresh() {
+  return employeesCache && employeesCache.expiresAt > Date.now() ? employeesCache.rows : null;
+}
+
+function devicesFresh() {
+  return devicesCache && devicesCache.expiresAt > Date.now() ? devicesCache.rows : null;
+}
+
+function setEmployeesCache(rows: string[][]) {
+  employeesCache = { rows, expiresAt: Date.now() + EMPLOYEES_TTL_MS };
+}
+
+function setDevicesCache(rows: string[][]) {
+  devicesCache = { rows, expiresAt: Date.now() + DEVICES_TTL_MS };
 }
 
 // ── employees ────────────────────────────────────────────────────────────────
@@ -145,6 +190,7 @@ export async function addEmployee(name: string, pin: string, role: "full_time" |
     valueInputOption: "RAW",
     requestBody: { values: [[name, pin, role, "TRUE"]] },
   });
+  invalidateEmployeesCache();
 }
 
 /**
@@ -178,6 +224,7 @@ export async function updateEmployee(
     valueInputOption: "RAW",
     requestBody: { values: [[name, nextPin, nextRole, nextActive]] },
   });
+  invalidateEmployeesCache();
 }
 
 // ── raw_punches ──────────────────────────────────────────────────────────────
@@ -450,6 +497,126 @@ export async function getMissingPunches(employee: string, yyyyMm: string): Promi
   } catch {
     return [];
   }
+}
+
+// ── identify (combined fast-path) ────────────────────────────────────────────
+
+export interface IdentifyContext {
+  /** matched device label, "" if enforcement disabled, null if token invalid */
+  deviceLabel: string | null;
+  employee: string | null;
+  lastKind: "in" | "out" | null;
+  missingPunches: MissingPunch[];
+}
+
+/**
+ * Single-roundtrip read for the PIN-entry flow.
+ *
+ * Combines devices, employees, raw_punches, and the current month's analyzed
+ * tab into one batchGet call (plus a parallel fallback for when the analyzed
+ * tab does not yet exist), replacing 4 sequential Sheets reads.
+ */
+export async function loadIdentifyContext(
+  pin: string,
+  yyyyMm: string,
+  deviceToken: string,
+): Promise<IdentifyContext> {
+  const sheets = getSheets();
+  const analyzedTab = `analyzed_${yyyyMm}`;
+
+  // Use cached employees + devices when fresh; only fetch what's missing in
+  // the batch. raw_punches and analyzed always come from Sheets.
+  const cachedEmployees = employeesFresh();
+  const cachedDevices = devicesFresh();
+  const ranges: string[] = [];
+  if (!cachedDevices) ranges.push(`${TAB_DEVICES}!A:C`);
+  if (!cachedEmployees) ranges.push(`${TAB_EMPLOYEES}!A:D`);
+  ranges.push(`${TAB_PUNCHES}!A:E`);
+
+  // The analyzed tab may not exist yet — keep it as a separate get so a 400
+  // there doesn't fail the whole batch.
+  const [batchRes, analyzedRows] = await Promise.all([
+    sheets.spreadsheets.values.batchGet({ spreadsheetId: sid(), ranges }),
+    sheets.spreadsheets.values
+      .get({ spreadsheetId: sid(), range: `${analyzedTab}!A:J` })
+      .then((r) => (r.data.values ?? []) as string[][])
+      .catch(() => [] as string[][]),
+  ]);
+
+  const valueRanges = batchRes.data.valueRanges ?? [];
+  let cursor = 0;
+  let devicesRows: string[][];
+  if (cachedDevices) {
+    devicesRows = cachedDevices;
+  } else {
+    devicesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
+    setDevicesCache(devicesRows);
+  }
+  let employeesRows: string[][];
+  if (cachedEmployees) {
+    employeesRows = cachedEmployees;
+  } else {
+    employeesRows = (valueRanges[cursor++]?.values ?? []) as string[][];
+    setEmployeesCache(employeesRows);
+  }
+  const punchesRows = (valueRanges[cursor]?.values ?? []) as string[][];
+
+  // Device check
+  const activeDevices = devicesRows
+    .slice(1)
+    .filter((r) => r[1] && r[2]?.toString().toUpperCase() === "TRUE");
+  let deviceLabel: string | null = "";
+  if (activeDevices.length > 0) {
+    const dev = activeDevices.find((r) => String(r[1]) === deviceToken);
+    deviceLabel = dev ? String(dev[0] ?? "") : null;
+  }
+
+  // PIN → employee
+  const empRow = employeesRows
+    .slice(1)
+    .find(
+      (r) => String(r[1] ?? "") === pin && r[3]?.toString().toUpperCase() === "TRUE",
+    );
+  const employee = empRow ? String(empRow[0]) : null;
+
+  if (!employee) {
+    return { deviceLabel, employee: null, lastKind: null, missingPunches: [] };
+  }
+
+  // Last punch kind
+  let latestTs = "";
+  let lastKind: "in" | "out" | null = null;
+  for (const r of punchesRows.slice(1)) {
+    if (r[0] !== employee) continue;
+    const ts = String(r[1] ?? "");
+    if (ts <= latestTs) continue;
+    const kind = r[4];
+    if (kind !== "in" && kind !== "out") continue;
+    latestTs = ts;
+    lastKind = kind;
+  }
+
+  // Missing punches (current month, past dates only)
+  const now = new Date();
+  const today = new Date(now.getTime() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const missingPunches: MissingPunch[] = [];
+  for (const r of analyzedRows.slice(1)) {
+    if (r[0] !== employee) continue;
+    const date = String(r[1] ?? "");
+    if (date >= today) continue;
+    const note = String(r[9] ?? "");
+    const shift = String(r[2] ?? "");
+    const inRaw = String(r[3] ?? "");
+    const outRaw = String(r[5] ?? "");
+    if (note.includes("缺下班打卡")) {
+      missingPunches.push({ date, shift, missing: "out", existing_time: inRaw });
+    }
+    if (note.includes("缺上班打卡")) {
+      missingPunches.push({ date, shift, missing: "in", existing_time: outRaw });
+    }
+  }
+
+  return { deviceLabel, employee, lastKind, missingPunches };
 }
 
 // ── devices ──────────────────────────────────────────────────────────────────

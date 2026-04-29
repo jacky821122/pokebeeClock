@@ -82,6 +82,29 @@ npx tsx scripts/generate_report.ts <YYYY-MM>
 
 A future admin download button can call `generateReport(month)` and stream the same buffer — no CLI-specific logic to port.
 
+## Performance notes
+
+Google Sheets is the only data store, and each call costs 200–500ms. The PIN-entry flow has been tuned to minimise that cost:
+
+- **Single round-trip per PIN entry** — `loadIdentifyContext` (`src/lib/sheets.ts`) issues one `batchGet` for `devices` + `employees` + `raw_punches` plus a parallel read of the current month's `analyzed_*` tab (kept separate so a missing tab doesn't fail the batch).
+- **Module-level auth + sheets client cache** — warm Vercel containers skip the SA-JSON parse and the client construction.
+- **TTL cache for slow-changing tabs** — `employees` and `devices` rows are cached for 5 minutes in memory. Admin add/update employee paths call `invalidateEmployeesCache()` so PIN changes propagate immediately. Direct Sheet edits to `devices` propagate within the TTL.
+
+### Cold-start mitigation (`/api/warmup`)
+
+iPad PWA usage is bursty: idle 2+ hours, then several employees punch in quick succession at ~10:00 / 14:00 / 16:00 / 20:00. Vercel recycles idle containers after ~10–15 min, so without intervention the first employee in each burst pays the full cold-start cost (~1–2s).
+
+`/api/warmup` runs the same batched read as identify (with an empty PIN) to warm the Node container, auth client, and TTL caches. Vercel free plan only allows one daily cron, so use an external scheduler (e.g. cron-job.org, GitHub Actions) to hit it before each daily peak:
+
+| Purpose | Taipei | UTC |
+|---|---|---|
+| Before 早班 | 09:50 | 01:50 |
+| 早班 end | 14:00 | 06:00 |
+| Before 晚班 | 15:50 | 07:50 |
+| 收班 | 20:00 | 12:00 |
+
+Caveat: free plan doesn't pin a single instance per region, so warm-up reduces — but doesn't eliminate — first-request cold starts.
+
 ## Development
 
 ```sh
