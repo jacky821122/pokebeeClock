@@ -239,11 +239,7 @@ export default function Home() {
             <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
-            {statusLoading && missingPunches.length === 0 ? (
-              <div className="w-full max-w-sm rounded-2xl border border-brand-honey/20 bg-white/70 p-4 text-sm text-brand-soft/60 shadow-sm lg:max-w-md lg:p-5">
-                載入缺卡紀錄中⋯
-              </div>
-            ) : missingPunches.length > 0 ? (
+            {missingPunches.length > 0 && (
               <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50/95 p-4 shadow-sm lg:max-w-md lg:p-5">
                 <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
                 {missingPunches.map((mp, i) => (
@@ -257,7 +253,7 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-            ) : null}
+            )}
 
             {process.env.NODE_ENV === "development" && (
               <div className="w-full max-w-sm lg:max-w-md">
