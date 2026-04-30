@@ -65,7 +65,7 @@ export default function Home() {
   const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState("");
   const [employee, setEmployee] = useState<string | null>(null);
-  const [suggested, setSuggested] = useState<PunchKind>("in");
+  const [suggested, setSuggested] = useState<PunchKind | null>(null);
   const [missingPunches, setMissingPunches] = useState<MissingPunch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +90,26 @@ export default function Home() {
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
+    setSuggested(null);
+  }
+
+  async function fetchStatus(enteredPin: string) {
+    try {
+      const res = await apiFetch("/api/employee_status", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: enteredPin }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSuggested(data.suggested_kind ?? null);
+        setMissingPunches(data.missing_punches ?? []);
+      }
+    } catch { /* silent — suggestion stays neutral, missing area shows empty */ }
   }
 
   async function handlePin(enteredPin: string) {
     setLoading(true); setError(null);
+    setSuggested(null); setMissingPunches([]);
     try {
       const res = await apiFetch("/api/identify", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -102,10 +118,10 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "PIN 不正確"); setPinKey((k) => k + 1); return; }
       setPin(enteredPin); setEmployee(data.employee);
-      setSuggested(data.suggested_kind ?? "in");
-      setMissingPunches(data.missing_punches ?? []);
       setCustomTs(nowTaipeiLocal()); setSupDate(todayTaipei()); setOtDate(todayTaipei());
       setView("punch");
+      // kick off slow-path status load in background
+      fetchStatus(enteredPin);
     } catch { setError("網路錯誤，請再試一次"); setPinKey((k) => k + 1); }
     finally { setLoading(false); }
   }

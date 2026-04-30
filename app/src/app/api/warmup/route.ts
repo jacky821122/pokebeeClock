@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadIdentifyContext } from "@/lib/sheets";
+import { findEmployeeByPinFast, loadEmployeeStatus } from "@/lib/sheets";
 import { currentYyyyMm } from "@/lib/time";
 
 /**
@@ -7,14 +7,17 @@ import { currentYyyyMm } from "@/lib/time";
  * (09:50 / 14:00 / 15:50 / 20:00 Taipei) so the first employee in each burst
  * doesn't pay the cold-start cost.
  *
- * Calling loadIdentifyContext with an empty PIN does the cheapest meaningful
- * read: it touches Sheets (warming auth + the sheets client + the employees /
- * devices TTL caches) and returns immediately because no PIN matches.
+ * Touches both the fast PIN path (warms auth + sheets client + employees /
+ * devices caches) and the slow status path (warms raw_punches + analyzed
+ * read paths) with throwaway inputs.
  */
 export async function GET() {
   const start = Date.now();
   try {
-    await loadIdentifyContext("", currentYyyyMm(), "");
+    await Promise.all([
+      findEmployeeByPinFast("", ""),
+      loadEmployeeStatus("__warmup__", currentYyyyMm()),
+    ]);
     return NextResponse.json({ ok: true, ms: Date.now() - start });
   } catch (err) {
     console.error("warmup failed", err);
