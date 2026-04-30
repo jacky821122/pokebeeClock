@@ -17,9 +17,7 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get("x-device-token") ?? "";
     const id = await findEmployeeByPinFast(pin, token);
 
-    // BYPASS: perf/optimistic-ui dev convenience. Remove before merging.
-    const bypass = process.env.NEXT_PUBLIC_BYPASS_AUTH === "1";
-    if (!bypass && id.deviceLabel === null) {
+    if (id.deviceLabel === null) {
       return NextResponse.json(
         { error: "裝置未授權", code: "device_invalid" },
         { status: 401 },
