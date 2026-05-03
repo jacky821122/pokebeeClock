@@ -247,7 +247,8 @@ export default function Home() {
               </div>
             )}
 
-            {process.env.NODE_ENV === "development" && (
+            {(process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") && (
+              // BYPASS: feat/extra-hours-and-dev-tools preview convenience. Remove before merging.
               <div className="w-full max-w-sm lg:max-w-md">
                 <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
                 <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}

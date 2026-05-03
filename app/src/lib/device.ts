@@ -26,6 +26,8 @@ export async function checkDevice(req: NextRequest): Promise<
   | { ok: true; label: string }
   | { ok: false; res: NextResponse }
 > {
+  // BYPASS: feat/extra-hours-and-dev-tools preview convenience. Remove before merging.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return { ok: true, label: "BYPASS" };
   const devices = await getDevices();
   if (devices.length === 0) return { ok: true, label: "" };
   const token = req.headers.get("x-device-token") ?? "";

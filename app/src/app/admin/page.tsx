@@ -25,6 +25,11 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
+    // BYPASS: feat/extra-hours-and-dev-tools preview convenience. Remove before merging.
+    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") {
+      setSecret("BYPASS");
+      return;
+    }
     const cached = sessionStorage.getItem(SECRET_KEY);
     if (cached) setSecret(cached);
   }, []);
