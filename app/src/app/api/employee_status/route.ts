@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findEmployeeByPinFast, loadEmployeeStatus } from "@/lib/sheets";
+import { resolveDeviceLabel } from "@/lib/device";
 import { currentYyyyMm } from "@/lib/time";
 
 /**
@@ -17,13 +18,8 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get("x-device-token") ?? "";
     const id = await findEmployeeByPinFast(pin, token);
 
-    // BYPASS: feat/extra-hours-and-dev-tools preview convenience. Remove before merging.
-    if (id.deviceLabel === null && process.env.NEXT_PUBLIC_BYPASS_AUTH !== "1") {
-      return NextResponse.json(
-        { error: "裝置未授權", code: "device_invalid" },
-        { status: 401 },
-      );
-    }
+    const dev = resolveDeviceLabel(id.deviceLabel);
+    if (!dev.ok) return dev.res;
     if (!id.employee) {
       return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
     }
