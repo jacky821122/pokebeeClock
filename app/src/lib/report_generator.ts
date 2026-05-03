@@ -126,10 +126,13 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
     for (const r of records) {
       wsDetail.addRow([
         r.employee, r.shift, r.date, r.in_raw, r.in_norm, r.out_raw, r.out_norm,
-        fmtHours(r.normal_hours), fmtHours(r.overtime_hours), r.note,
+        r.normal_hours, r.overtime_hours, r.note,
       ]);
     }
   }
+  // 正常時數 / 加班時數: stored as numbers so Excel doesn't flag "number as text".
+  wsDetail.getColumn(8).numFmt = "0.0";
+  wsDetail.getColumn(9).numFmt = "0.0";
 
   // Approximate auto-fit — same heuristic as the Python version.
   for (const ws of [wsSummary, wsDetail]) {

@@ -72,6 +72,21 @@ export function fmtHours(hours: number): string {
   return s;
 }
 
+/**
+ * Format decimal hours as human-readable `X 小時 Y 分`.
+ * - 0 minutes → just `X 小時`
+ * - <1 hour → just `Y 分`
+ * - rounds to nearest minute, with carry-over so 4.9999 → "5 小時"
+ */
+export function fmtHoursMinutes(hours: number): string {
+  const totalMin = Math.max(0, Math.round(hours * 60));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m} 分`;
+  if (m === 0) return `${h} 小時`;
+  return `${h} 小時 ${m} 分`;
+}
+
 /** Format a Date as `YYYY-MM-DD HH:MM:SS` (local time), Python `%Y-%m-%d %H:%M:%S`. */
 export function fmtTimestamp(dt: Date): string {
   return `${fmtDate(dt)} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}:${pad2(dt.getSeconds())}`;

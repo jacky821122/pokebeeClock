@@ -13,7 +13,7 @@
 import type { Event } from "./events";
 import {
   fmtDate,
-  fmtHours,
+  fmtHoursMinutes,
   fmtMinuteStamp,
   fmtTimestamp,
   normalizeInTime,
@@ -92,7 +92,7 @@ function handleFullTime(
     // Flag if raw punch diff > 10hr 15min (use original timestamps, not normalized)
     const rawDiffHours = (outTs!.getTime() - inTs!.getTime()) / 3600 / 1000;
     if (rawDiffHours >= 10.25) {
-      notes.push(`上班時間 ${fmtHours(rawDiffHours)} 小時（超過 10 小時 15 分），請確認是否需申請加班`);
+      notes.push(`上班時間 ${fmtHoursMinutes(rawDiffHours)}（超過 10 小時 15 分），請確認是否需申請加班`);
     }
   }
 
@@ -179,7 +179,7 @@ function handleHourly(
     normal = worked;
 
     if (worked > 4.0) {
-      notes.push(`${shift}，實際 ${fmtHours(worked)} 小時，上限 4 小時`);
+      notes.push(`${shift}，實際 ${fmtHoursMinutes(worked)}，上限 4 小時`);
     }
   }
 
@@ -230,7 +230,7 @@ export function applyDailyCapForPt(
 
     if (actualTotal >= 8.25) {
       summary.overtime_specials.push(
-        `${date} 日實際總時數 ${fmtHours(actualTotal)} 小時（超過 8 小時 15 分），請確認是否需申請加班`,
+        `${date} 日實際總時數 ${fmtHoursMinutes(actualTotal)}（超過 8 小時 15 分），請確認是否需申請加班`,
       );
     }
 
