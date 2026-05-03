@@ -55,12 +55,13 @@ function addRecord(
   summary: EmployeeSummary,
   rec: PairRecord,
   forceSpecial: boolean,
-): void {
+): PairRecord {
   records.push(rec);
   summary.normal_hours += rec.normal_hours;
   if (forceSpecial || rec.note) {
     summary.specials.push(`${rec.date} ${rec.note}`);
   }
+  return rec;
 }
 
 function handleFullTime(
@@ -91,6 +92,7 @@ function handleFullTime(
 
     // Flag if raw punch diff > 10hr 15min (use original timestamps, not normalized)
     const rawDiffHours = (outTs!.getTime() - inTs!.getTime()) / 3600 / 1000;
+    // `>=` for cap+15min grace — boundary itself is "long enough to alert".
     if (rawDiffHours >= 10.25) {
       notes.push(`上班時間 ${fmtHoursMinutes(rawDiffHours)}（超過 10 小時 15 分），請確認是否需申請加班`);
     }
@@ -118,6 +120,7 @@ function handleFullTime(
 function handleHourly(
   summary: EmployeeSummary,
   records: PairRecord[],
+  rawHoursMap: WeakMap<PairRecord, number>,
   name: string,
   inTs: Date | null,
   outTs: Date | null,
@@ -130,6 +133,7 @@ function handleHourly(
 
   let shift = "未知";
   let normal = 0.0;
+  let rawWorked: number | null = null;
   const notes: string[] = [];
 
   if (inferredNoIn || !inTs) {
@@ -144,14 +148,14 @@ function handleHourly(
     shift = classifyShift(inNorm!);
     notes.push("缺下班打卡，需人工確認");
   } else {
-    // Both present — check for full-day span (in < 14:00, out >= 20:00)
-    // This means the employee worked both shifts but forgot to clock out
-    // at end of early shift and clock in at start of late shift.
-    // → Two missing punch records: 早班缺out + 晚班缺in
+    // Both present — check for full-day span (in < 14:00, out >= 17:00).
+    // Heuristic: a single hourly shift caps at 4hr, plus 加時申請 / 上限寬限
+    // can plausibly stretch to ~5hr. Any out >= 17:00 with in < 14:00 is
+    // unlikely to be one shift, so treat it as 早班缺out + 晚班缺in.
     const inH = inNorm!.getHours() + inNorm!.getMinutes() / 60;
     const outH = outNorm!.getHours() + outNorm!.getMinutes() / 60;
 
-    if (inH < 14 && outH >= 15) {
+    if (inH < 14 && outH >= 17) {
       // Early shift: has in, missing out → 0hr + flag
       addRecord(records, summary, {
         employee: name, date, shift: "早班",
@@ -173,17 +177,20 @@ function handleHourly(
       return;
     }
 
-    // Normal single-shift: actual hours (cap applied later in applyDailyCapForPt)
+    // Normal single-shift: pay uses normalized hours (cap applied later in
+    // applyDailyCapForPt), but the per-shift over-cap flag uses raw so the
+    // message matches the employee's actual punches.
     shift = classifyShift(inNorm!);
     const worked = Math.max((outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000, 0);
     normal = worked;
 
-    if (worked > 4.0) {
-      notes.push(`${shift}，實際 ${fmtHoursMinutes(worked)}，上限 4 小時`);
+    rawWorked = Math.max((outTs!.getTime() - inTs!.getTime()) / 3600 / 1000, 0);
+    if (rawWorked >= 4.25) {
+      notes.push(`${shift}，實際 ${fmtHoursMinutes(rawWorked)}，上限 4 小時`);
     }
   }
 
-  addRecord(
+  const rec = addRecord(
     records,
     summary,
     {
@@ -200,6 +207,7 @@ function handleHourly(
     },
     notes.length > 0 || inferredNoIn,
   );
+  if (rawWorked !== null) rawHoursMap.set(rec, rawWorked);
 }
 
 /**
@@ -210,6 +218,7 @@ function handleHourly(
 export function applyDailyCapForPt(
   records: PairRecord[],
   summary: EmployeeSummary,
+  rawHoursMap: WeakMap<PairRecord, number> = new WeakMap(),
 ): void {
   const dayMap = new Map<string, PairRecord[]>();
   for (const r of records) {
@@ -225,12 +234,13 @@ export function applyDailyCapForPt(
   for (const date of sortedDates) {
     const dayRecs = dayMap.get(date)!;
 
-    // Sum actual worked hours (before any cap) for flag check
-    const actualTotal = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);
+    // Daily flag uses raw worked hours so the alert matches actual punches,
+    // not the normalized rounding. Records with missing punches contribute 0.
+    const rawTotal = dayRecs.reduce((acc, r) => acc + (rawHoursMap.get(r) ?? 0), 0);
 
-    if (actualTotal >= 8.25) {
+    if (rawTotal >= 8.25) {
       summary.overtime_specials.push(
-        `${date} 日實際總時數 ${fmtHoursMinutes(actualTotal)}（超過 8 小時 15 分），請確認是否需申請加班`,
+        `${date} 日實際總時數 ${fmtHoursMinutes(rawTotal)}（超過 8 小時 15 分），請確認是否需申請加班`,
       );
     }
 
@@ -269,6 +279,7 @@ export function analyzeEmployee(
     overtime_specials: [],
   };
   const records: PairRecord[] = [];
+  const rawHoursMap = new WeakMap<PairRecord, number>();
 
   let currentIn: Date | null = null;
 
@@ -280,7 +291,7 @@ export function analyzeEmployee(
     if (isFullTime) {
       handleFullTime(summary, records, name, inTs, outTs, inferredNoIn);
     } else {
-      handleHourly(summary, records, name, inTs, outTs, inferredNoIn);
+      handleHourly(summary, records, rawHoursMap, name, inTs, outTs, inferredNoIn);
     }
   };
 
@@ -345,7 +356,7 @@ export function analyzeEmployee(
   }
 
   if (!isFullTime) {
-    applyDailyCapForPt(records, summary);
+    applyDailyCapForPt(records, summary, rawHoursMap);
   }
 
   return { summary, records };

@@ -75,7 +75,7 @@ describe("V2 analyzer — hourly", () => {
   it("early shift 10:00-14:00 → 4hr", () => {
     const { summary, records } = analyzeEmployee("B", [
       ev("clock-in", "2026-02-01", "10:00"),
-      ev("clock-out", "2026-02-01", "14:02"),
+      ev("clock-out", "2026-02-01", "14:00"),
     ], false);
     expect(records[0]!.shift).toBe("早班");
     expect(records[0]!.normal_hours).toBe(4);
@@ -107,7 +107,7 @@ describe("V2 analyzer — hourly", () => {
     expect(summary.normal_hours).toBe(0);
   });
 
-  it("10:00-18:00 also triggers missing punch detection (out >= 15:00)", () => {
+  it("10:00-18:00 also triggers missing punch detection (out >= 17:00)", () => {
     const { records } = analyzeEmployee("B", [
       ev("clock-in", "2026-02-01", "10:00"),
       ev("clock-out", "2026-02-01", "18:00"),

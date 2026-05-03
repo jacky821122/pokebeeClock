@@ -79,7 +79,7 @@ export async function generateReport(yyyyMm: string, log?: (label: string) => vo
   return buf;
 }
 
-async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
+export async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
 
   // ── 摘要 ────────────────────────────────────────────────────────────────
@@ -122,12 +122,40 @@ async function buildWorkbook(results: EmployeeResult[]): Promise<Buffer> {
     "員工", "班別", "日期", "上班原始", "上班normalized",
     "下班原始", "下班normalized", "正常時數", "加班時數", "備註",
   ]);
-  for (const { records } of results) {
-    for (const r of records) {
-      wsDetail.addRow([
-        r.employee, r.shift, r.date, r.in_raw, r.in_norm, r.out_raw, r.out_norm,
-        r.normal_hours, r.overtime_hours, r.note,
-      ]);
+  for (const { summary, records, overtimeRequests } of results) {
+    // Group overtime requests by date so each date's punch rows are followed
+    // by its overtime rows (synthesized as separate "加班" records — display
+    // only, not persisted).
+    const otByDate = new Map<string, typeof overtimeRequests>();
+    for (const o of overtimeRequests) {
+      const bucket = otByDate.get(o.date);
+      if (bucket) bucket.push(o);
+      else otByDate.set(o.date, [o]);
+    }
+
+    const dates = Array.from(new Set([
+      ...records.map((r) => r.date),
+      ...overtimeRequests.map((o) => o.date),
+    ])).sort();
+
+    for (const date of dates) {
+      for (const r of records) {
+        if (r.date !== date) continue;
+        wsDetail.addRow([
+          r.employee, r.shift, r.date, r.in_raw, r.in_norm, r.out_raw, r.out_norm,
+          r.normal_hours, r.overtime_hours, r.note,
+        ]);
+      }
+      for (const o of otByDate.get(date) ?? []) {
+        const inStamp = `${o.date} ${o.start_time}:00`;
+        const outStamp = `${o.date} ${o.end_time}:00`;
+        const inMin = `${o.date} ${o.start_time}`;
+        const outMin = `${o.date} ${o.end_time}`;
+        wsDetail.addRow([
+          summary.employee, "加班", o.date, inStamp, inMin, outStamp, outMin,
+          0, o.minutes / 60, o.reason ?? "",
+        ]);
+      }
     }
   }
   // 正常時數 / 加班時數: stored as numbers so Excel doesn't flag "number as text".
