@@ -344,9 +344,14 @@ export default function Home() {
                 const diff = hmToMin(otEnd) - hmToMin(otStart);
                 const rounded = diff > 0 ? Math.floor(diff / 15) * 15 : 0;
                 return rounded > 0 ? (
-                  <p className="text-center text-sm text-gray-500">
-                    加班時數：<span className="font-semibold text-gray-800">{rounded} 分鐘</span>（{(rounded / 60).toFixed(2)} 小時）
-                  </p>
+                  <>
+                    <p className="text-center text-sm text-gray-500">
+                      申請時數：<span className="font-semibold text-gray-800">{rounded} 分鐘</span>（{(rounded / 60).toFixed(2)} 小時）
+                    </p>
+                    <p className="text-center text-xs text-gray-500">
+                      註：當日上班時數超過 8 小時 將依勞基法以加班倍率計算
+                    </p>
+                  </>
                 ) : null;
               })()}
               <button onClick={handleOvertime} disabled={loading}
