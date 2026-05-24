@@ -24,15 +24,13 @@ export type DeviceCheck =
 
 /**
  * Resolve a device label produced by `findEmployeeByPinFast` (or any inline
- * lookup) into the same shape as `checkDevice`. Single source of truth for
- * the BYPASS gate so the two device-check paths can't drift.
+ * lookup) into the same shape as `checkDevice`, so the two device-check
+ * paths can't drift.
  *
  * Convention from the lookup: `null` = enforcement on and no match,
  * `""` = enforcement disabled (no active devices), any other string = label.
  */
 export function resolveDeviceLabel(label: string | null): DeviceCheck {
-  // BYPASS: feat/extra-hours-and-dev-tools preview convenience. Remove before merging.
-  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return { ok: true, label: "BYPASS" };
   if (label === null) {
     return {
       ok: false,
