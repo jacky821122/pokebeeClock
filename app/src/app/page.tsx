@@ -7,7 +7,7 @@ import PinPad from "@/components/PinPad";
 import { apiFetch } from "@/lib/device_client";
 import type { PunchKind } from "@/types";
 
-type View = "pin" | "punch" | "supplement" | "overtime" | "success";
+type View = "pin" | "punch" | "supplement" | "overtime" | "records" | "success";
 
 interface MissingPunch {
   date: string;
@@ -23,6 +23,14 @@ interface OtRecord {
   end_time: string;
   minutes: number;
   reason: string;
+}
+
+interface RecentPunchRecord {
+  client_ts: string;
+  server_ts: string;
+  source: string;
+  kind: PunchKind;
+  device: string;
 }
 
 /** Default supplement time based on shift + missing type */
@@ -61,6 +69,20 @@ function hmToMin(hm: string): number {
   return h * 60 + m;
 }
 
+function formatPunchDate(ts: string): string {
+  return ts.slice(0, 10);
+}
+
+function formatPunchTime(ts: string): string {
+  return ts.slice(11, 16);
+}
+
+function sourceLabel(source: string): string {
+  if (source === "supplement") return "補登";
+  if (source === "ichef-import") return "匯入";
+  return "打卡";
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState("");
@@ -82,6 +104,8 @@ export default function Home() {
   const [otReason, setOtReason] = useState("");
   const [otRecords, setOtRecords] = useState<OtRecord[]>([]);
   const [otLoading, setOtLoading] = useState(false);
+  const [recentRecords, setRecentRecords] = useState<RecentPunchRecord[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,7 +114,7 @@ export default function Home() {
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
-    setSuggested(null);
+    setSuggested(null); setRecentRecords([]);
   }
 
   async function fetchStatus(enteredPin: string) {
@@ -197,6 +221,24 @@ export default function Home() {
     loadOtRecords();
   }
 
+  async function loadRecentRecords() {
+    if (!pin) return;
+    setRecentLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/punch/recent?pin=${encodeURIComponent(pin)}`);
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "讀取失敗"); return; }
+      setRecentRecords(data.records ?? []);
+    } catch { setError("網路錯誤"); }
+    finally { setRecentLoading(false); }
+  }
+
+  function goToRecentRecords() {
+    setView("records");
+    loadRecentRecords();
+  }
+
   function prefillFromMissing(mp: MissingPunch) {
     setSupDate(mp.date); setSupKind(mp.missing);
     setSupTime(defaultSupTime(mp.shift, mp.missing));
@@ -260,14 +302,18 @@ export default function Home() {
               <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
             </div>
 
-            <div className="flex w-full max-w-sm gap-3 pt-2 lg:max-w-md lg:gap-4">
+            <div className="grid w-full max-w-sm grid-cols-1 gap-3 pt-2 sm:grid-cols-3 lg:max-w-md lg:gap-4">
               <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
-                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
+                className="rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 📝 補登打卡
               </button>
               <button onClick={goToOvertime}
-                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
+                className="rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 🕐 加班申請
+              </button>
+              <button onClick={goToRecentRecords}
+                className="rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
+                📋 最近打卡
               </button>
             </div>
 
@@ -390,6 +436,46 @@ export default function Home() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2">返回</button>
+          </div>
+        )}
+
+        {view === "records" && employee && (
+          <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-8">
+            <p className="text-2xl font-bold text-brand">{employee}・最近打卡</p>
+            {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+
+            <div className="w-full max-w-sm">
+              <p className="mb-2 text-sm font-semibold text-brand-soft">最近 10 筆紀錄</p>
+              {recentLoading ? (
+                <p className="text-xs text-brand-soft/50">載入中…</p>
+              ) : recentRecords.length === 0 ? (
+                <p className="text-xs text-brand-soft/50">無打卡紀錄</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentRecords.map((r, i) => (
+                    <div key={`${r.client_ts}-${r.kind}-${i}`} className="rounded-xl border border-brand-honey/20 bg-white/95 px-3 py-3 shadow-[0_2px_12px_rgba(90,58,40,0.06)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-brand">
+                            {formatPunchDate(r.client_ts)} <span className="text-brand-soft">{formatPunchTime(r.client_ts)}</span>
+                          </p>
+                          <p className="mt-0.5 text-xs text-brand-soft/60">
+                            {sourceLabel(r.source)}{r.device ? `・${r.device}` : ""}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-bold ${
+                          r.kind === "in" ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"
+                        }`}>
+                          {r.kind === "in" ? "上班" : "下班"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

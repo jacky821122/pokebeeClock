@@ -250,6 +250,14 @@ export interface PunchRow {
   kind: "in" | "out" | "";
 }
 
+export interface RecentPunchRecord {
+  client_ts: string;
+  server_ts: string;
+  source: string;
+  kind: "in" | "out";
+  device: string;
+}
+
 export async function getPunchesForMonth(employee: string, yyyyMm: string): Promise<PunchRow[]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
@@ -310,6 +318,34 @@ export async function getLastPunchKind(employee: string): Promise<"in" | "out" |
     latestKind = kind;
   }
   return latestKind;
+}
+
+/**
+ * Recent raw punches for an employee, newest client timestamp first.
+ * Called only from the opt-in records view so it stays off the hot punch path.
+ */
+export async function getRecentPunches(employee: string, limit = 10): Promise<RecentPunchRecord[]> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sid(),
+    range: `${TAB_PUNCHES}!A:F`,
+  });
+  const rows = res.data.values ?? [];
+  const records: RecentPunchRecord[] = [];
+  for (const r of rows.slice(1)) {
+    if (r[0] !== employee) continue;
+    const kind = r[4];
+    if (kind !== "in" && kind !== "out") continue;
+    records.push({
+      client_ts: String(r[1] ?? ""),
+      server_ts: String(r[2] ?? ""),
+      source: String(r[3] ?? ""),
+      kind,
+      device: String(r[5] ?? ""),
+    });
+  }
+  records.sort((a, b) => b.client_ts.localeCompare(a.client_ts));
+  return records.slice(0, limit);
 }
 
 export async function getActiveEmployeesSortedByLastPunch(): Promise<string[]> {
@@ -791,4 +827,3 @@ export async function deleteOvertimeRequest(submittedAt: string, employee: strin
   }
   return false;
 }
-
