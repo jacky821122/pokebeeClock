@@ -20,14 +20,12 @@ interface DraftRow {
 const SECRET_KEY = "pokebee_admin_secret";
 
 export default function AdminPage() {
-  const [secret, setSecret] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return sessionStorage.getItem(SECRET_KEY);
+  });
   const [secretInput, setSecretInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const cached = sessionStorage.getItem(SECRET_KEY);
-    if (cached) setSecret(cached);
-  }, []);
 
   async function tryAuth(s: string) {
     setAuthError(null);

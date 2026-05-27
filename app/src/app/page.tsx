@@ -7,7 +7,7 @@ import PinPad from "@/components/PinPad";
 import { apiFetch } from "@/lib/device_client";
 import type { PunchKind } from "@/types";
 
-type View = "pin" | "punch" | "supplement" | "overtime" | "success";
+type View = "pin" | "punch" | "supplement" | "overtime" | "records" | "success";
 
 interface MissingPunch {
   date: string;
@@ -23,6 +23,21 @@ interface OtRecord {
   end_time: string;
   minutes: number;
   reason: string;
+}
+
+interface RecentPunchRecord {
+  client_ts: string;
+  server_ts: string;
+  source: string;
+  kind: PunchKind;
+  device: string;
+}
+
+interface MonthSummary {
+  month: string;
+  workedDays: number;
+  normalHours: number;
+  overtimeHours: number;
 }
 
 /** Default supplement time based on shift + missing type */
@@ -61,6 +76,14 @@ function hmToMin(hm: string): number {
   return h * 60 + m;
 }
 
+function formatPunchDate(ts: string): string {
+  return ts.slice(0, 10);
+}
+
+function formatPunchTime(ts: string): string {
+  return ts.slice(11, 16);
+}
+
 export default function Home() {
   const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState("");
@@ -82,6 +105,9 @@ export default function Home() {
   const [otReason, setOtReason] = useState("");
   const [otRecords, setOtRecords] = useState<OtRecord[]>([]);
   const [otLoading, setOtLoading] = useState(false);
+  const [recentRecords, setRecentRecords] = useState<RecentPunchRecord[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [monthSummary, setMonthSummary] = useState<MonthSummary | null>(null);
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,7 +116,7 @@ export default function Home() {
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
-    setSuggested(null);
+    setSuggested(null); setRecentRecords([]); setMonthSummary(null);
   }
 
   async function fetchStatus(enteredPin: string) {
@@ -197,6 +223,25 @@ export default function Home() {
     loadOtRecords();
   }
 
+  async function loadRecentRecords() {
+    if (!pin) return;
+    setRecentLoading(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/punch/recent?pin=${encodeURIComponent(pin)}`);
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "讀取失敗"); return; }
+      setRecentRecords(data.records ?? []);
+      setMonthSummary(data.summary ?? null);
+    } catch { setError("網路錯誤"); }
+    finally { setRecentLoading(false); }
+  }
+
+  function goToRecentRecords() {
+    setView("records");
+    loadRecentRecords();
+  }
+
   function prefillFromMissing(mp: MissingPunch) {
     setSupDate(mp.date); setSupKind(mp.missing);
     setSupTime(defaultSupTime(mp.shift, mp.missing));
@@ -260,14 +305,18 @@ export default function Home() {
               <DirectionButton label="下班" emoji="🔴" suggested={suggested === "out"} onClick={() => handlePunch("out")} />
             </div>
 
-            <div className="flex w-full max-w-sm gap-3 pt-2 lg:max-w-md lg:gap-4">
+            <div className="grid w-full max-w-sm grid-cols-1 gap-3 pt-2 sm:grid-cols-3 lg:max-w-md lg:gap-4">
               <button onClick={() => { setSupContext(null); setSupDate(todayTaipei()); setSupKind("in"); setSupTime("10:00"); setView("supplement"); }}
-                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
+                className="rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 📝 補登打卡
               </button>
               <button onClick={goToOvertime}
-                className="flex-1 rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
+                className="rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
                 🕐 加班申請
+              </button>
+              <button onClick={goToRecentRecords}
+                className="rounded-2xl border border-brand-honey/20 bg-white/90 px-3 py-3 text-sm font-medium text-brand-soft shadow-sm transition-all active:scale-[0.98] active:bg-brand-sand lg:py-4 lg:text-base">
+                📋 最近打卡
               </button>
             </div>
 
@@ -390,6 +439,59 @@ export default function Home() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => { setError(null); setView("punch"); }} className="text-sm text-brand-soft/60 underline-offset-2">返回</button>
+          </div>
+        )}
+
+        {view === "records" && employee && (
+          <div className="glass-panel flex flex-col items-center gap-5 rounded-[1.75rem] px-4 pb-8 pt-8">
+            <p className="text-2xl font-bold text-brand">{employee}・打卡紀錄</p>
+            {error && <p className="text-sm font-medium text-red-500">{error}</p>}
+
+            {/* Monthly summary */}
+            {monthSummary && (
+              <div className="w-full max-w-sm rounded-2xl border border-brand-honey/30 bg-brand-honey/10 px-4 py-3">
+                <p className="mb-1 text-xs font-semibold text-brand-soft/60">{monthSummary.month} 當月累計</p>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xl font-bold text-brand">{monthSummary.normalHours.toFixed(1)} <span className="text-sm font-normal text-brand-soft">小時</span></span>
+                  {monthSummary.overtimeHours > 0 && (
+                    <span className="text-sm text-brand-soft">+ 加班 {monthSummary.overtimeHours.toFixed(1)} 小時</span>
+                  )}
+                  <span className="ml-auto text-xs text-brand-soft/50">{monthSummary.workedDays} 天</span>
+                </div>
+              </div>
+            )}
+
+            {/* Punch list */}
+            <div className="w-full max-w-sm">
+              <p className="mb-2 text-xs font-semibold text-brand-soft/50 uppercase tracking-wide">最近 50 筆</p>
+              {recentLoading ? (
+                <p className="text-xs text-brand-soft/50">載入中…</p>
+              ) : recentRecords.length === 0 ? (
+                <p className="text-xs text-brand-soft/50">無打卡紀錄</p>
+              ) : (
+                <div className="space-y-1">
+                  {recentRecords.map((r, i) => (
+                    <div key={`${r.client_ts}-${r.kind}-${i}`}
+                      className="flex items-center justify-between rounded-xl border border-brand-honey/15 bg-white/95 px-3 py-2">
+                      <span className="text-sm text-brand">
+                        {formatPunchDate(r.client_ts)}
+                        <span className="ml-2 font-semibold tabular-nums">{formatPunchTime(r.client_ts)}</span>
+                        {r.source === "supplement" && (
+                          <span className="ml-1.5 text-xs text-amber-600">補登</span>
+                        )}
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        r.kind === "in" ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"
+                      }`}>
+                        {r.kind === "in" ? "上班" : "下班"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
