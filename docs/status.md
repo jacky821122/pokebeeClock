@@ -80,6 +80,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-05-28 — 員工最近打卡紀錄：PIN 後可另開「最近打卡」view 查最近 10 筆，不影響主打卡快路徑；preview branch 加入 `NEXT_PUBLIC_BYPASS_AUTH` BYPASS 區塊 (32ba3eb)
 - 2026-04-26 — 視覺改版：pokebee logo + 棕色品牌色系（brand/cream/sand/honey/accent）、PWA icons 補齊、漸層背景 + glass-panel + honey 色脈、移除 hover/加 touch 化、greeting 文字（早/午/晚安）、補登/加班頁面用 input-soft 統一、重算按鈕 amber→rose
 - 2026-04-26 — 移除 amendments（補登申請）功能：`/amend` 頁、`/api/amend`、`AmendForm`、Sheet `amendments` tab 全數刪除；report_generator 移除 amendments 區塊
 - 2026-04-25 — Device token 來源從 env 改為 Sheet `devices` tab：管理權統一在 Sheet edit access、撤銷免 redeploy、無 cache 即時生效
