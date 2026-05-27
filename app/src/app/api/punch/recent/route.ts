@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkDevice } from "@/lib/device";
-import { findEmployeeByPin, getRecentPunches } from "@/lib/sheets";
+import { findEmployeeByPin, getRecentPunches, getAnalyzedMonthSummary } from "@/lib/sheets";
+import { currentYyyyMm } from "@/lib/time";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,8 +14,11 @@ export async function GET(req: NextRequest) {
     const employee = await findEmployeeByPin(pin);
     if (!employee) return NextResponse.json({ error: "PIN 不正確" }, { status: 401 });
 
-    const records = await getRecentPunches(employee, 10);
-    return NextResponse.json({ records });
+    const [records, summary] = await Promise.all([
+      getRecentPunches(employee, 50),
+      getAnalyzedMonthSummary(employee, currentYyyyMm()),
+    ]);
+    return NextResponse.json({ records, summary });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "讀取失敗" }, { status: 500 });

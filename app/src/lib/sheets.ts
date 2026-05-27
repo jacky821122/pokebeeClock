@@ -348,6 +348,44 @@ export async function getRecentPunches(employee: string, limit = 10): Promise<Re
   return records.slice(0, limit);
 }
 
+export interface MonthSummary {
+  month: string;          // "YYYY-MM"
+  workedDays: number;
+  normalHours: number;
+  overtimeHours: number;
+}
+
+/**
+ * Sum normal_hours + overtime_hours from analyzed_YYYY-MM for an employee.
+ * Returns null if the tab doesn't exist yet.
+ */
+export async function getAnalyzedMonthSummary(
+  employee: string,
+  yyyyMm: string,
+): Promise<MonthSummary | null> {
+  const sheets = getSheets();
+  const tab = `analyzed_${yyyyMm}`;
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sid(),
+      range: `${tab}!A:J`,
+    });
+    const rows = (res.data.values ?? []).slice(1);
+    let workedDays = 0;
+    let normalHours = 0;
+    let overtimeHours = 0;
+    for (const r of rows) {
+      if (r[0] !== employee) continue;
+      workedDays++;
+      normalHours += Number(r[7] ?? 0);
+      overtimeHours += Number(r[8] ?? 0);
+    }
+    return { month: yyyyMm, workedDays, normalHours, overtimeHours };
+  } catch {
+    return null;
+  }
+}
+
 export async function getActiveEmployeesSortedByLastPunch(): Promise<string[]> {
   const sheets = getSheets();
   const [empRes, punchRes] = await Promise.all([

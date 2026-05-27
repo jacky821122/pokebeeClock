@@ -33,6 +33,13 @@ interface RecentPunchRecord {
   device: string;
 }
 
+interface MonthSummary {
+  month: string;
+  workedDays: number;
+  normalHours: number;
+  overtimeHours: number;
+}
+
 /** Default supplement time based on shift + missing type */
 function defaultSupTime(shift: string, missing: "in" | "out"): string {
   if (shift === "早班") return missing === "in" ? "10:00" : "14:00";
@@ -77,12 +84,6 @@ function formatPunchTime(ts: string): string {
   return ts.slice(11, 16);
 }
 
-function sourceLabel(source: string): string {
-  if (source === "supplement") return "補登";
-  if (source === "ichef-import") return "匯入";
-  return "打卡";
-}
-
 export default function Home() {
   const [view, setView] = useState<View>("pin");
   const [pin, setPin] = useState("");
@@ -106,6 +107,7 @@ export default function Home() {
   const [otLoading, setOtLoading] = useState(false);
   const [recentRecords, setRecentRecords] = useState<RecentPunchRecord[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const [monthSummary, setMonthSummary] = useState<MonthSummary | null>(null);
 
   const beeClicks = useRef(0);
   const beeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,7 +116,7 @@ export default function Home() {
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
     setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
-    setSuggested(null); setRecentRecords([]);
+    setSuggested(null); setRecentRecords([]); setMonthSummary(null);
   }
 
   async function fetchStatus(enteredPin: string) {
@@ -230,6 +232,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "讀取失敗"); return; }
       setRecentRecords(data.records ?? []);
+      setMonthSummary(data.summary ?? null);
     } catch { setError("網路錯誤"); }
     finally { setRecentLoading(false); }
   }
@@ -445,35 +448,48 @@ export default function Home() {
         )}
 
         {view === "records" && employee && (
-          <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-8">
-            <p className="text-2xl font-bold text-brand">{employee}・最近打卡</p>
+          <div className="glass-panel flex flex-col items-center gap-5 rounded-[1.75rem] px-4 pb-8 pt-8">
+            <p className="text-2xl font-bold text-brand">{employee}・打卡紀錄</p>
             {error && <p className="text-sm font-medium text-red-500">{error}</p>}
 
+            {/* Monthly summary */}
+            {monthSummary && (
+              <div className="w-full max-w-sm rounded-2xl border border-brand-honey/30 bg-brand-honey/10 px-4 py-3">
+                <p className="mb-1 text-xs font-semibold text-brand-soft/60">{monthSummary.month} 當月累計</p>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-xl font-bold text-brand">{monthSummary.normalHours.toFixed(1)} <span className="text-sm font-normal text-brand-soft">小時</span></span>
+                  {monthSummary.overtimeHours > 0 && (
+                    <span className="text-sm text-brand-soft">+ 加班 {monthSummary.overtimeHours.toFixed(1)} 小時</span>
+                  )}
+                  <span className="ml-auto text-xs text-brand-soft/50">{monthSummary.workedDays} 天</span>
+                </div>
+              </div>
+            )}
+
+            {/* Punch list */}
             <div className="w-full max-w-sm">
-              <p className="mb-2 text-sm font-semibold text-brand-soft">最近 10 筆紀錄</p>
+              <p className="mb-2 text-xs font-semibold text-brand-soft/50 uppercase tracking-wide">最近 50 筆</p>
               {recentLoading ? (
                 <p className="text-xs text-brand-soft/50">載入中…</p>
               ) : recentRecords.length === 0 ? (
                 <p className="text-xs text-brand-soft/50">無打卡紀錄</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {recentRecords.map((r, i) => (
-                    <div key={`${r.client_ts}-${r.kind}-${i}`} className="rounded-xl border border-brand-honey/20 bg-white/95 px-3 py-3 shadow-[0_2px_12px_rgba(90,58,40,0.06)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-brand">
-                            {formatPunchDate(r.client_ts)} <span className="text-brand-soft">{formatPunchTime(r.client_ts)}</span>
-                          </p>
-                          <p className="mt-0.5 text-xs text-brand-soft/60">
-                            {sourceLabel(r.source)}{r.device ? `・${r.device}` : ""}
-                          </p>
-                        </div>
-                        <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-bold ${
-                          r.kind === "in" ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"
-                        }`}>
-                          {r.kind === "in" ? "上班" : "下班"}
-                        </span>
-                      </div>
+                    <div key={`${r.client_ts}-${r.kind}-${i}`}
+                      className="flex items-center justify-between rounded-xl border border-brand-honey/15 bg-white/95 px-3 py-2">
+                      <span className="text-sm text-brand">
+                        {formatPunchDate(r.client_ts)}
+                        <span className="ml-2 font-semibold tabular-nums">{formatPunchTime(r.client_ts)}</span>
+                        {r.source === "supplement" && (
+                          <span className="ml-1.5 text-xs text-amber-600">補登</span>
+                        )}
+                      </span>
+                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        r.kind === "in" ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"
+                      }`}>
+                        {r.kind === "in" ? "上班" : "下班"}
+                      </span>
                     </div>
                   ))}
                 </div>
