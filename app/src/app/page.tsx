@@ -449,7 +449,13 @@ export default function Home() {
 
         {view === "records" && employee && (
           <div className="glass-panel flex flex-col items-center gap-5 rounded-[1.75rem] px-4 pb-8 pt-8">
-            <p className="text-2xl font-bold text-brand">{employee}・打卡紀錄</p>
+            <div className="flex w-full max-w-sm items-center gap-3">
+              <button onClick={() => { setError(null); setView("punch"); }}
+                className="shrink-0 rounded-full border border-brand-honey/30 bg-white/80 px-3 py-1.5 text-sm font-medium text-brand-soft active:bg-brand-honey/20">
+                ← 返回
+              </button>
+              <p className="flex-1 text-right text-lg font-bold text-brand">{employee}・打卡紀錄</p>
+            </div>
             {error && <p className="text-sm font-medium text-red-500">{error}</p>}
 
             {/* Monthly summary */}
