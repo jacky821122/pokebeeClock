@@ -31,9 +31,6 @@ export type DeviceCheck =
  * `""` = enforcement disabled (no active devices), any other string = label.
  */
 export function resolveDeviceLabel(label: string | null): DeviceCheck {
-  // BYPASS: missing-punch-modal preview convenience. Remove before merging.
-  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return { ok: true, label: "preview-bypass" };
-
   if (label === null) {
     return {
       ok: false,
@@ -48,9 +45,6 @@ export function resolveDeviceLabel(label: string | null): DeviceCheck {
  * label, or "" if enforcement is disabled (empty devices list).
  */
 export async function checkDevice(req: NextRequest): Promise<DeviceCheck> {
-  // BYPASS: missing-punch-modal preview convenience. Remove before merging.
-  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return { ok: true, label: "preview-bypass" };
-
   const devices = await getDevices();
   const token = req.headers.get("x-device-token") ?? "";
   let label: string | null;
