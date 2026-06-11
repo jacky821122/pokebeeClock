@@ -276,22 +276,6 @@ export default function Home() {
             <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
-            {missingPunches.length > 0 && (
-              <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50/95 p-4 shadow-sm lg:max-w-md lg:p-5">
-                <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
-                {missingPunches.map((mp, i) => (
-                  <button key={i} onClick={() => prefillFromMissing(mp)}
-                    className="mb-1 block w-full rounded-xl bg-amber-100/90 px-3 py-2 text-left text-sm text-amber-900 transition-all active:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
-                    {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
-                    {mp.existing_time && (
-                      <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
-                    )}
-                    <span className="ml-2 text-xs text-amber-600 lg:text-sm">點擊補登 →</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             {process.env.NODE_ENV === "development" && (
               <div className="w-full max-w-sm lg:max-w-md">
                 <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
@@ -319,6 +303,24 @@ export default function Home() {
                 📋 最近打卡
               </button>
             </div>
+
+            {/* Loads async after login — kept below every action button so its
+                late arrival never shifts anything the employee is about to tap. */}
+            {missingPunches.length > 0 && (
+              <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50/95 p-4 shadow-sm lg:max-w-md lg:p-5">
+                <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
+                {missingPunches.map((mp, i) => (
+                  <button key={i} onClick={() => prefillFromMissing(mp)}
+                    className="mb-1 block w-full rounded-xl bg-amber-100/90 px-3 py-2 text-left text-sm text-amber-900 transition-all active:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
+                    {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
+                    {mp.existing_time && (
+                      <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
+                    )}
+                    <span className="ml-2 text-xs text-amber-600 lg:text-sm">點擊補登 →</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <button onClick={resetToPin} className="text-sm text-brand-soft/60 underline-offset-2 lg:text-base">取消</button>
           </div>
