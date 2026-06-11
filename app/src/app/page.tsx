@@ -90,6 +90,7 @@ export default function Home() {
   const [employee, setEmployee] = useState<string | null>(null);
   const [suggested, setSuggested] = useState<PunchKind | null>(null);
   const [missingPunches, setMissingPunches] = useState<MissingPunch[]>([]);
+  const [missingDismissed, setMissingDismissed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinKey, setPinKey] = useState(0);
@@ -115,7 +116,7 @@ export default function Home() {
 
   function resetToPin() {
     setView("pin"); setPin(""); setEmployee(null); setError(null);
-    setMissingPunches([]); setPinKey((k) => k + 1); setSupContext(null);
+    setMissingPunches([]); setMissingDismissed(false); setPinKey((k) => k + 1); setSupContext(null);
     setSuggested(null); setRecentRecords([]); setMonthSummary(null);
   }
 
@@ -135,7 +136,7 @@ export default function Home() {
 
   async function handlePin(enteredPin: string) {
     setLoading(true); setError(null);
-    setSuggested(null); setMissingPunches([]);
+    setSuggested(null); setMissingPunches([]); setMissingDismissed(false);
     try {
       const res = await apiFetch("/api/identify", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -275,22 +276,6 @@ export default function Home() {
           <div className="glass-panel flex flex-col items-center gap-6 rounded-[1.75rem] px-4 pb-8 pt-6 lg:gap-8 lg:px-8 lg:pt-8">
             <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
-
-            {missingPunches.length > 0 && (
-              <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50/95 p-4 shadow-sm lg:max-w-md lg:p-5">
-                <p className="mb-2 text-sm font-semibold text-amber-800 lg:text-base">⚠️ 缺卡紀錄</p>
-                {missingPunches.map((mp, i) => (
-                  <button key={i} onClick={() => prefillFromMissing(mp)}
-                    className="mb-1 block w-full rounded-xl bg-amber-100/90 px-3 py-2 text-left text-sm text-amber-900 transition-all active:bg-amber-200 lg:px-4 lg:py-3 lg:text-base">
-                    {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
-                    {mp.existing_time && (
-                      <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
-                    )}
-                    <span className="ml-2 text-xs text-amber-600 lg:text-sm">點擊補登 →</span>
-                  </button>
-                ))}
-              </div>
-            )}
 
             {process.env.NODE_ENV === "development" && (
               <div className="w-full max-w-sm lg:max-w-md">
@@ -514,6 +499,30 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Missing-punch reminder as an overlay so its (late) arrival never
+          shifts the punch buttons — stray taps land on the backdrop, not a button. */}
+      {view === "punch" && employee && missingPunches.length > 0 && !missingDismissed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-amber-300/80 bg-amber-50 p-5 shadow-xl lg:max-w-md">
+            <p className="mb-3 text-base font-semibold text-amber-800 lg:text-lg">⚠️ 缺卡紀錄</p>
+            {missingPunches.map((mp, i) => (
+              <button key={i} onClick={() => prefillFromMissing(mp)}
+                className="mb-2 block w-full rounded-xl bg-amber-100 px-3 py-3 text-left text-sm text-amber-900 transition-all active:bg-amber-200 lg:px-4 lg:text-base">
+                {mp.date} {mp.shift} — 缺{mp.missing === "in" ? "上班" : "下班"}打卡
+                {mp.existing_time && (
+                  <span className="ml-1 text-xs text-amber-700 lg:text-sm">（已有{mp.missing === "out" ? "上班" : "下班"} {mp.existing_time}）</span>
+                )}
+                <span className="ml-2 text-xs text-amber-600 lg:text-sm">點擊補登 →</span>
+              </button>
+            ))}
+            <button onClick={() => setMissingDismissed(true)}
+              className="mt-2 w-full rounded-xl border border-amber-300/60 bg-white/80 px-3 py-3 text-sm font-medium text-amber-800 transition-all active:scale-[0.98] active:bg-amber-100 lg:text-base">
+              稍後再說
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
