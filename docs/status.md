@@ -8,10 +8,6 @@
 
 預設插在最上面。每項：**做什麼 + 為什麼**。Claude 完成後移到下方完成區。
 
-11. **正職休息扣除規則修正** —
-    * 現在正職一律固定扣 2hr 休息（`analyzer.ts` handleFullTime），導致短班不合理：10:00-14:00 在場 4hr 只給 2hr。
-    * 期望：在場不到 8 小時不扣休息。傾向改成 `worked = min(span, 8)`（不到 8 全給、超過封頂 8），避免「<8 不扣 / ≥8 扣 2」在 8hr 邊界出現多待反而領更少的斷崖。
-    * 動到計薪核心，需重算既有 `analyzed_*` 並對照 `../pokebee/clock_in_out_analyzer.py` 確認原始設計意圖；拆獨立 branch 做。
 0. **「老闆的話」功能（成功打卡後顯示）** —
     * 老闆 ↔ 員工的小溝通介面：成功打卡時抽一條老闆訊息顯示在 ✅ 下方，員工可在自動跳回前點固定 emoji 回應（❤️🙏🤔），不延長 timer。
     * Sheet 設計（避免 id 對照麻煩，直接存文字）：
@@ -84,6 +80,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-06-16 — 正職時數規則改為 `min(span, 8)`：移除固定扣 2hr 休息，短班（在場 < 8hr）全額給付、超過 8hr 由 cap 吸收，消除 8hr 邊界斷崖。Python V1 是寫死 8hr，V2 本就刻意偏離 parity (d0d5835)
 - 2026-06-16 — 打卡紀錄 view：每筆有效下班列顯示 `+N 小時`（直接取 `analyzed_*` 的 normal+overtime，非重算），讓「當月累計」可逐列對帳；移除會誤導計時人員的天數顯示 (55ef3f0)
 - 2026-05-28 — 員工最近打卡紀錄：PIN 後可另開「最近打卡」view 查最近 10 筆，不影響主打卡快路徑；preview branch 加入 `NEXT_PUBLIC_BYPASS_AUTH` BYPASS 區塊 (32ba3eb)
 - 2026-04-26 — 視覺改版：pokebee logo + 棕色品牌色系（brand/cream/sand/honey/accent）、PWA icons 補齊、漸層背景 + glass-panel + honey 色脈、移除 hover/加 touch 化、greeting 文字（早/午/晚安）、補登/加班頁面用 input-soft 統一、重算按鈕 amber→rose
