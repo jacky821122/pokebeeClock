@@ -85,10 +85,12 @@ function handleFullTime(
   } else if (!outTs) {
     notes.push("缺下班打卡，需人工確認");
   } else {
-    // Full-time: punch diff - 2hr break, cap 8hr
+    // Full-time: pay the in/out span, capped at 8hr. No break deduction —
+    // a short day (span < 8hr) is paid in full; presence beyond 8hr absorbs
+    // the (unpaid) break via the cap. This avoids the 8hr-boundary cliff a
+    // flat "−2hr break" would create (e.g. 8hr present paying less than 7.9hr).
     const normHours = (outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000;
-    const worked = Math.max(normHours - 2, 0);
-    normal = Math.min(worked, 8.0);
+    normal = Math.min(Math.max(normHours, 0), 8.0);
 
     // Flag if raw punch diff > 10hr 15min (use original timestamps, not normalized)
     const rawDiffHours = (outTs!.getTime() - inTs!.getTime()) / 3600 / 1000;

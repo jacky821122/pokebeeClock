@@ -2,7 +2,7 @@
  * V2 analyzer tests: verify the new calculation rules.
  * - No automatic overtime (overtime_hours always 0)
  * - Missing punch = 0hr + flag
- * - Full-time: punch diff - 2hr break, cap 8hr, flag at >10hr15min
+ * - Full-time: in/out span, cap 8hr (no break deduction), flag at >10hr15min
  * - Hourly: actual hours, per-shift cap 4hr, daily cap 8hr, flag at >8hr15min
  */
 import { describe, expect, it } from "vitest";
@@ -21,7 +21,7 @@ function ev(kind: Event["kind"], dateStr?: string, hm?: string): Event {
 }
 
 describe("V2 analyzer — full-time", () => {
-  it("normal day 10:00-20:00 → 8hr (10hr - 2hr break)", () => {
+  it("normal day 10:00-20:00 → 8hr (span 10hr capped at 8)", () => {
     const { summary, records } = analyzeEmployee("A", [
       ev("clock-in", "2026-02-01", "10:00"),
       ev("clock-out", "2026-02-01", "20:00"),
@@ -31,6 +31,24 @@ describe("V2 analyzer — full-time", () => {
     expect(records[0]!.normal_hours).toBe(8);
     expect(records[0]!.overtime_hours).toBe(0);
     expect(records[0]!.note).toBe("");
+  });
+
+  it("short day 10:00-14:00 → 4hr (span < 8hr, no break deduction)", () => {
+    const { summary, records } = analyzeEmployee("A", [
+      ev("clock-in", "2026-02-01", "10:00"),
+      ev("clock-out", "2026-02-01", "14:00"),
+    ], true);
+    expect(summary.normal_hours).toBe(4);
+    expect(records[0]!.normal_hours).toBe(4);
+    expect(records[0]!.note).toBe("");
+  });
+
+  it("8hr present 09:00-17:00 → 8hr (boundary, no cliff)", () => {
+    const { records } = analyzeEmployee("A", [
+      ev("clock-in", "2026-02-01", "09:00"),
+      ev("clock-out", "2026-02-01", "17:00"),
+    ], true);
+    expect(records[0]!.normal_hours).toBe(8);
   });
 
   it("long day 10:00-21:09 → 8hr + flag (>10hr15min)", () => {
