@@ -256,6 +256,8 @@ export interface RecentPunchRecord {
   source: string;
   kind: "in" | "out";
   device: string;
+  /** Hours this punch contributed to the month total (out punches only, when > 0). */
+  hours?: number;
 }
 
 export async function getPunchesForMonth(employee: string, yyyyMm: string): Promise<PunchRow[]> {
@@ -350,7 +352,6 @@ export async function getRecentPunches(employee: string, limit = 10): Promise<Re
 
 export interface MonthSummary {
   month: string;          // "YYYY-MM"
-  workedDays: number;
   normalHours: number;
   overtimeHours: number;
 }
@@ -358,11 +359,15 @@ export interface MonthSummary {
 /**
  * Sum normal_hours + overtime_hours from analyzed_YYYY-MM for an employee.
  * Returns null if the tab doesn't exist yet.
+ *
+ * `contributions` maps each contributing shift's `out_raw` (the analyzed
+ * `YYYY-MM-DD HH:MM:SS` out timestamp) to the hours it added to the total,
+ * so the records view can show a per-out-punch breakdown of the summary.
  */
 export async function getAnalyzedMonthSummary(
   employee: string,
   yyyyMm: string,
-): Promise<MonthSummary | null> {
+): Promise<(MonthSummary & { contributions: Record<string, number> }) | null> {
   const sheets = getSheets();
   const tab = `analyzed_${yyyyMm}`;
   try {
@@ -371,16 +376,20 @@ export async function getAnalyzedMonthSummary(
       range: `${tab}!A:J`,
     });
     const rows = (res.data.values ?? []).slice(1);
-    let workedDays = 0;
     let normalHours = 0;
     let overtimeHours = 0;
+    const contributions: Record<string, number> = {};
     for (const r of rows) {
       if (r[0] !== employee) continue;
-      workedDays++;
-      normalHours += Number(r[7] ?? 0);
-      overtimeHours += Number(r[8] ?? 0);
+      const normal = Number(r[7] ?? 0);
+      const overtime = Number(r[8] ?? 0);
+      normalHours += normal;
+      overtimeHours += overtime;
+      const outRaw = String(r[5] ?? "");
+      const contributed = normal + overtime;
+      if (outRaw && contributed > 0) contributions[outRaw] = contributed;
     }
-    return { month: yyyyMm, workedDays, normalHours, overtimeHours };
+    return { month: yyyyMm, normalHours, overtimeHours, contributions };
   } catch {
     return null;
   }
