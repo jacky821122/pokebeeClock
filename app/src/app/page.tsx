@@ -31,6 +31,7 @@ interface RecentPunchRecord {
   source: string;
   kind: PunchKind;
   device: string;
+  hours?: number;
 }
 
 interface MonthSummary {
@@ -493,10 +494,17 @@ export default function Home() {
                           <span className="ml-1.5 text-xs text-amber-600">補登</span>
                         )}
                       </span>
-                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        r.kind === "in" ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"
-                      }`}>
-                        {r.kind === "in" ? "上班" : "下班"}
+                      <span className="flex shrink-0 items-center gap-2">
+                        {r.kind === "out" && r.hours != null && (
+                          <span className="rounded-full bg-brand-honey/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-brand-soft">
+                            +{r.hours.toFixed(1)} 小時
+                          </span>
+                        )}
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                          r.kind === "in" ? "bg-green-50 text-green-700" : "bg-rose-50 text-rose-700"
+                        }`}>
+                          {r.kind === "in" ? "上班" : "下班"}
+                        </span>
                       </span>
                     </div>
                   ))}
