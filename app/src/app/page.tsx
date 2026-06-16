@@ -36,7 +36,6 @@ interface RecentPunchRecord {
 
 interface MonthSummary {
   month: string;
-  workedDays: number;
   normalHours: number;
   overtimeHours: number;
 }
@@ -470,7 +469,6 @@ export default function Home() {
                   {monthSummary.overtimeHours > 0 && (
                     <span className="text-sm text-brand-soft">+ 加班 {monthSummary.overtimeHours.toFixed(1)} 小時</span>
                   )}
-                  <span className="ml-auto text-xs text-brand-soft/50">{monthSummary.workedDays} 天</span>
                 </div>
               </div>
             )}

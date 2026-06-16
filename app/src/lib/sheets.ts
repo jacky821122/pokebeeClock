@@ -352,7 +352,6 @@ export async function getRecentPunches(employee: string, limit = 10): Promise<Re
 
 export interface MonthSummary {
   month: string;          // "YYYY-MM"
-  workedDays: number;
   normalHours: number;
   overtimeHours: number;
 }
@@ -377,13 +376,11 @@ export async function getAnalyzedMonthSummary(
       range: `${tab}!A:J`,
     });
     const rows = (res.data.values ?? []).slice(1);
-    let workedDays = 0;
     let normalHours = 0;
     let overtimeHours = 0;
     const contributions: Record<string, number> = {};
     for (const r of rows) {
       if (r[0] !== employee) continue;
-      workedDays++;
       const normal = Number(r[7] ?? 0);
       const overtime = Number(r[8] ?? 0);
       normalHours += normal;
@@ -392,7 +389,7 @@ export async function getAnalyzedMonthSummary(
       const contributed = normal + overtime;
       if (outRaw && contributed > 0) contributions[outRaw] = contributed;
     }
-    return { month: yyyyMm, workedDays, normalHours, overtimeHours, contributions };
+    return { month: yyyyMm, normalHours, overtimeHours, contributions };
   } catch {
     return null;
   }

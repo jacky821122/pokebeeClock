@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
     const summary = summaryWithContrib
       ? {
           month: summaryWithContrib.month,
-          workedDays: summaryWithContrib.workedDays,
           normalHours: summaryWithContrib.normalHours,
           overtimeHours: summaryWithContrib.overtimeHours,
         }
