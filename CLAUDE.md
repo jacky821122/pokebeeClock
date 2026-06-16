@@ -16,7 +16,7 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 
 ## Analyzer
 
-- **V2 rules** (2026-04-20): no automatic overtime, missing punch = 0hr + flag, full-time deducts 2hr break, per-shift cap 4hr (hourly), daily cap 8hr. All overtime comes from overtime requests (not yet built).
+- **V2 rules** (2026-04-20): no automatic overtime, missing punch = 0hr + flag, full-time = in/out span capped at 8hr (no break deduction; short days paid in full, the cap absorbs presence beyond 8hr — see 2026-06-16 change replacing the earlier flat −2hr break that under-paid short shifts), per-shift cap 4hr (hourly), daily cap 8hr. All overtime comes from overtime requests (not yet built).
 - **`isFullTime` must come from `employees.role`.** Never hardcode employee names anywhere in analyzer-related code paths.
 - **Shifts**: only 早班 / 晚班 (no sub-categories). Classification based on `normalizedIn < 14:00`.
 - **Shift windows**: 早班 9:00-15:00, 晚班 15:00-21:00 (normal ±1hr buffer). If hourly employee's `normIn < 14:00` and `normOut >= 15:00`, it is treated as two missing punches (早班缺out + 晚班缺in), not a single long shift.
