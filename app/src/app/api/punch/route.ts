@@ -43,7 +43,14 @@ export async function POST(req: NextRequest) {
     await appendPunch(punch);
     // For supplement punches, reanalyze based on the client_ts month (the
     // historical date being corrected), not the current server timestamp.
-    const triggerTs = effectiveSource === "supplement" ? punch.client_ts : punch.server_ts;
+    // BYPASS: feature/hourly-daily-cap-only preview convenience. Remove before merging.
+    // The dev time picker can date a normal punch into another month; without
+    // this the reanalyze would run on the current month and the custom-dated
+    // record would never be written. Not safe for production — a device with a
+    // wrong clock would reanalyze the wrong month.
+    const debugTs = process.env.NEXT_PUBLIC_BYPASS_AUTH === "1" ? punch.client_ts : null;
+    const triggerTs =
+      effectiveSource === "supplement" ? punch.client_ts : (debugTs ?? punch.server_ts);
     await reanalyzeEmployee(employee, triggerTs);
 
     return NextResponse.json({ ok: true, employee, server_ts: punch.server_ts });

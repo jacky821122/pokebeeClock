@@ -276,7 +276,10 @@ export default function Home() {
             <p className="rounded-full bg-brand-honey/30 px-3 py-1 text-sm font-medium text-brand-soft lg:text-base">{greetingTaipei()}，今天也辛苦了 ✨</p>
             <p className="-mt-3 text-2xl font-bold text-brand lg:text-4xl">{employee}</p>
 
-            {process.env.NODE_ENV === "development" && (
+            {/* BYPASS: feature/hourly-daily-cap-only preview convenience. Remove the
+                BYPASS_AUTH half of this condition before merging (keep the dev half). */}
+            {(process.env.NODE_ENV === "development" ||
+              process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") && (
               <div className="w-full max-w-sm lg:max-w-md">
                 <label className="mb-1 block text-xs text-gray-400 lg:text-sm">打卡時間（測試用）</label>
                 <input type="datetime-local" value={customTs} onChange={(e) => setCustomTs(e.target.value)}
