@@ -294,9 +294,21 @@ export function applyDailyCapForPt(
     const perShiftCap = isDailyCapOnly(date) ? Infinity : 4.0;
     let remainingNormal = 8.0;
     for (const r of dayRecs) {
-      r.normal_hours = Math.min(r.normal_hours, perShiftCap);
-      r.normal_hours = Math.min(r.normal_hours, remainingNormal); // daily cap
+      const beforeCap = Math.min(r.normal_hours, perShiftCap);
+      r.normal_hours = Math.min(beforeCap, remainingNormal); // daily cap
       remainingNormal = Math.max(0, remainingNormal - r.normal_hours);
+
+      // Note on the record that actually lost hours, not just in the summary —
+      // otherwise a shift silently shows fewer hours than it was punched for
+      // and the employee has no way to see why on their own row.
+      const lost = beforeCap - r.normal_hours;
+      if (lost > 1e-9) {
+        const note =
+          r.normal_hours <= 1e-9
+            ? `本日已達 8 小時上限，本段 ${fmtHoursMinutes(beforeCap)} 未列入計薪，請確認是否需申請加班`
+            : `本日已達 8 小時上限，本段 ${fmtHoursMinutes(beforeCap)} 僅計 ${fmtHoursMinutes(r.normal_hours)}（少計 ${fmtHoursMinutes(lost)}），請確認是否需申請加班`;
+        r.note = r.note ? `${r.note}；${note}` : note;
+      }
     }
 
     const cappedTotal = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);

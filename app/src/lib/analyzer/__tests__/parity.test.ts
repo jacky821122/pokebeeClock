@@ -326,6 +326,33 @@ describe("V2 analyzer — hourly, daily-cap-only (2026-08-01 onward)", () => {
     expect(summary.overtime_specials[0]).toContain("請確認是否需申請加班");
   });
 
+  it("daily-cap truncation is noted on the record that lost the hours", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "15:00"),
+      ev("clock-in", "2026-08-03", "17:00"),
+      ev("clock-out", "2026-08-03", "21:00"),
+    ], false);
+    expect(records[0]!.note).toBe(""); // paid in full, nothing to explain
+    expect(records[1]!.note).toContain("本日已達 8 小時上限");
+    expect(records[1]!.note).toContain("本段 4 小時 僅計 2 小時");
+    expect(records[1]!.note).toContain("少計 2 小時");
+    // Must not trip the missing-punch prompt (sheets.ts matches these substrings).
+    expect(records[1]!.note).not.toContain("缺上班打卡");
+    expect(records[1]!.note).not.toContain("缺下班打卡");
+  });
+
+  it("a shift fully absorbed by the daily cap says 未列入計薪", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "17:00"), // 8hr, fills the cap
+      ev("clock-in", "2026-08-03", "18:00"),
+      ev("clock-out", "2026-08-03", "20:00"),
+    ], false);
+    expect(records[1]!.normal_hours).toBe(0);
+    expect(records[1]!.note).toContain("本段 2 小時 未列入計薪");
+  });
+
   it("missing punches still produce 0hr + flag", () => {
     const { summary, records } = analyzeEmployee("B", [
       ev("clock-in", "2026-08-03", "10:55"),
