@@ -45,6 +45,9 @@ export function resolveDeviceLabel(label: string | null): DeviceCheck {
  * label, or "" if enforcement is disabled (empty devices list).
  */
 export async function checkDevice(req: NextRequest): Promise<DeviceCheck> {
+  // BYPASS: feature/hourly-daily-cap-only preview convenience. Remove before merging.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return { ok: true, label: "preview" };
+
   const devices = await getDevices();
   const token = req.headers.get("x-device-token") ?? "";
   let label: string | null;
