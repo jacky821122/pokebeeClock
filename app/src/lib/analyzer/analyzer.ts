@@ -229,7 +229,7 @@ function handleHourly(
       // avoids "缺上班打卡"/"缺下班打卡" — getMissingPunches matches on those
       // substrings and would otherwise raise a phantom missing-punch prompt.
       notes.push(
-        `單段 ${fmtHoursMinutes(rawWorked)}（超過 ${LONG_SPAN_HOURS} 小時），請確認是否漏打卡或需申請加班`,
+        `單段 ${fmtHoursMinutes(rawWorked)}（達 ${LONG_SPAN_HOURS} 小時以上），請確認是否漏打卡或需申請加班`,
       );
     }
   }

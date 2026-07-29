@@ -270,7 +270,7 @@ describe("V2 analyzer — hourly, daily-cap-only (2026-08-01 onward)", () => {
     ], false);
     expect(records).toHaveLength(1);
     expect(records[0]!.normal_hours).toBe(7);
-    expect(records[0]!.note).toContain("超過 7 小時");
+    expect(records[0]!.note).toContain("達 7 小時以上");
     expect(summary.normal_hours).toBe(7);
   });
 
