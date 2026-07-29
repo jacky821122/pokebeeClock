@@ -31,6 +31,12 @@ export type DeviceCheck =
  * `""` = enforcement disabled (no active devices), any other string = label.
  */
 export function resolveDeviceLabel(label: string | null): DeviceCheck {
+  // BYPASS: feature/hourly-daily-cap-only preview convenience. Remove before merging.
+  // Sits here rather than only in checkDevice because the PIN flow
+  // (/api/identify, /api/employee_status) reaches the device gate through
+  // findEmployeeByPinFast + this function, never through checkDevice.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return { ok: true, label: "preview" };
+
   if (label === null) {
     return {
       ok: false,
