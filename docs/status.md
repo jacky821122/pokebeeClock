@@ -53,12 +53,18 @@ page.tsx → /api/identify → findEmployeeByPin() → { employee, suggested_kin
                                                writeAnalyzedRecords()
 
 V2 analyzer 規則：
-- 正職：(norm_out - norm_in - 2hr break), cap 8hr, flag if raw > 10hr15min
-- 計時：(norm_out - norm_in), per-shift cap 4hr, daily cap 8hr
-- 計時全日班偵測：normIn < 14:00 且 normOut >= 15:00 → 早班缺out + 晚班缺in
+- 正職：(norm_out - norm_in), cap 8hr（不扣休息）, flag if raw > 10hr15min
+- 計時：(norm_out - norm_in), daily cap 8hr（依打卡順序先到先得，超過的截後面那班）
+- 計時長班 note：單筆 raw span >= 7hr → 照算但 note 提醒（可能漏打卡或需申請加班）
 - 缺打卡：0hr + flag（不預設時數）
 - 超時flag：用實際時數（cap前）判定 > 8hr15min
+- 班別：早班/晚班純描述用，不影響任何時數計算
 - **加班：系統不自動計算，全部來自加班申請**
+
+計時規則以「記錄日期」分版本（`DAILY_CAP_ONLY_FROM = "2026-08-01"`）。
+2026-08-01 之前的記錄走舊規則：per-shift cap 4hr、且 normIn < 14:00 且 normOut >= 17:00
+會拆成 早班缺out + 晚班缺in（各 0hr）。已給薪月份必須可重現，補打卡會重算整月，
+所以不可回頭改舊月份的算法；規則再變時加新的 cutover 常數，不要改舊分支。
 
 補打卡流程：
 打卡頁 → 選擇補打日期/時間 → /api/punch (source=supplement, triggerTs=client_ts月份)
@@ -80,6 +86,7 @@ scripts/generate_report.ts <YYYY-MM>
 
 格式：`- YYYY-MM-DD — 一句話 (commit hash)`。只記對應某個 request、或明顯新增/移除功能的改動；小修補、typo、註解調整不記。
 
+- 2026-07-29 — 計時人員取消單班 4hr 上限，改為只設日上限 8hr；原本「normIn < 14:00 且 normOut >= 17:00 → 拆成兩筆缺卡 0hr」改為照算 + 單筆 raw span >= 7hr 加 note 提醒（避免真的連上一整天被歸零，同時保留漏打卡的警示）。核心概念改為「員工在正確時間打卡，算出來就是實際時數」，不再受營業/休息時間反推。規則以記錄日期分版本（`DAILY_CAP_ONLY_FROM = 2026-08-01`），之前的月份維持舊算法以確保已給薪資料可重現；被日上限截斷的那一班在該筆 note 標明打卡多少/實計多少/少計多少，不只寫在摘要 (2b3e03b, 28040da)
 - 2026-06-16 — 正職時數規則改為 `min(span, 8)`：移除固定扣 2hr 休息，短班（在場 < 8hr）全額給付、超過 8hr 由 cap 吸收，消除 8hr 邊界斷崖。Python V1 是寫死 8hr，V2 本就刻意偏離 parity (d0d5835)
 - 2026-06-16 — 打卡紀錄 view：每筆有效下班列顯示 `+N 小時`（直接取 `analyzed_*` 的 normal+overtime，非重算），讓「當月累計」可逐列對帳；移除會誤導計時人員的天數顯示 (55ef3f0)
 - 2026-05-28 — 員工最近打卡紀錄：PIN 後可另開「最近打卡」view 查最近 10 筆，不影響主打卡快路徑；preview branch 加入 `NEXT_PUBLIC_BYPASS_AUTH` BYPASS 區塊 (32ba3eb)

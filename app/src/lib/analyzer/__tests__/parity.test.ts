@@ -3,7 +3,11 @@
  * - No automatic overtime (overtime_hours always 0)
  * - Missing punch = 0hr + flag
  * - Full-time: in/out span, cap 8hr (no break deduction), flag at >10hr15min
- * - Hourly: actual hours, per-shift cap 4hr, daily cap 8hr, flag at >8hr15min
+ * - Hourly: actual hours, daily cap 8hr, flag at >8hr15min
+ *
+ * Hourly rules are versioned by record date (`DAILY_CAP_ONLY_FROM`), so the
+ * "hourly" block below uses pre-cutover dates and the "hourly, daily-cap-only"
+ * block uses post-cutover ones.
  */
 import { describe, expect, it } from "vitest";
 import { analyzeEmployee } from "../analyzer";
@@ -89,7 +93,7 @@ describe("V2 analyzer — full-time", () => {
   });
 });
 
-describe("V2 analyzer — hourly", () => {
+describe("V2 analyzer — hourly (pre-2026-08-01: per-shift cap + full-day split)", () => {
   it("early shift 10:00-14:00 → 4hr", () => {
     const { summary, records } = analyzeEmployee("B", [
       ev("clock-in", "2026-02-01", "10:00"),
@@ -213,5 +217,182 @@ describe("V2 analyzer — hourly", () => {
     // Second pair: 16:30-20:30 = 4hr
     expect(records[1]!.normal_hours).toBe(4);
     expect(records[1]!.shift).toBe("晚班");
+  });
+});
+
+describe("V2 analyzer — hourly, daily-cap-only (2026-08-01 onward)", () => {
+  it("2.5hr shift 10:00-12:30 → paid in full", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "10:00"),
+      ev("clock-out", "2026-08-03", "12:30"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.normal_hours).toBe(2.5);
+    expect(records[0]!.note).toBe("");
+    expect(summary.normal_hours).toBe(2.5);
+  });
+
+  it("4.5hr shift 16:00-20:30 → 4.5hr, no per-shift cap, no note", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "16:00"),
+      ev("clock-out", "2026-08-03", "20:30"),
+    ], false);
+    expect(records[0]!.shift).toBe("晚班");
+    expect(records[0]!.normal_hours).toBe(4.5);
+    expect(records[0]!.note).toBe("");
+    expect(summary.normal_hours).toBe(4.5);
+  });
+
+  it("6hr shift 09:00-15:00 → 6hr, no note (below 7hr threshold)", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "15:00"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.normal_hours).toBe(6);
+    expect(records[0]!.note).toBe("");
+  });
+
+  it("12:00-17:00 → one 5hr record (no longer split by the old in<14/out>=17 rule)", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "12:00"),
+      ev("clock-out", "2026-08-03", "17:00"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.normal_hours).toBe(5);
+    expect(records[0]!.note).toBe("");
+  });
+
+  it("09:00-16:00 → 7hr paid + note at the threshold boundary", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "16:00"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.normal_hours).toBe(7);
+    expect(records[0]!.note).toContain("達 7 小時以上");
+    expect(summary.normal_hours).toBe(7);
+  });
+
+  it("10:00-18:00 → one 8hr record + note (was split into two 0hr records before)", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "10:00"),
+      ev("clock-out", "2026-08-03", "18:00"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.shift).toBe("早班");
+    expect(records[0]!.normal_hours).toBe(8);
+    expect(records[0]!.note).toContain("請確認是否漏打卡或需申請加班");
+    expect(summary.normal_hours).toBe(8);
+    // raw 8.0 < 8.25 → the daily overtime reminder does not fire; the
+    // long-span note is the only signal, which is exactly why it exists.
+    expect(summary.overtime_specials).toHaveLength(0);
+  });
+
+  it("long-span note never contains the missing-punch substrings", () => {
+    // getMissingPunches / loadEmployeeStatus match on these; a collision would
+    // raise a phantom 缺卡 prompt on a record that has both punches.
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "10:00"),
+      ev("clock-out", "2026-08-03", "20:00"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(records[0]!.note).not.toContain("缺上班打卡");
+    expect(records[0]!.note).not.toContain("缺下班打卡");
+  });
+
+  it("10:00-20:00 → capped at 8hr, long-span note + daily overtime reminder", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "10:00"),
+      ev("clock-out", "2026-08-03", "20:00"),
+    ], false);
+    expect(records[0]!.normal_hours).toBe(8);
+    expect(records[0]!.overtime_hours).toBe(0);
+    expect(summary.normal_hours).toBe(8);
+    expect(summary.overtime_specials[0]).toContain("請確認是否需申請加班");
+  });
+
+  it("daily cap is first-come-first-served: 6hr + 4hr → 6hr and 2hr", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "15:00"),
+      ev("clock-in", "2026-08-03", "17:00"),
+      ev("clock-out", "2026-08-03", "21:00"),
+    ], false);
+    expect(records).toHaveLength(2);
+    expect(records[0]!.normal_hours).toBe(6);
+    expect(records[1]!.normal_hours).toBe(2); // truncated by the daily cap
+    expect(summary.normal_hours).toBe(8);
+    expect(summary.overtime_specials[0]).toContain("請確認是否需申請加班");
+  });
+
+  it("daily-cap truncation is noted on the record that lost the hours", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "15:00"),
+      ev("clock-in", "2026-08-03", "17:00"),
+      ev("clock-out", "2026-08-03", "21:00"),
+    ], false);
+    expect(records[0]!.note).toBe(""); // paid in full, nothing to explain
+    expect(records[1]!.note).toContain("本日已達 8 小時上限");
+    expect(records[1]!.note).toContain("本段 4 小時 僅計 2 小時");
+    expect(records[1]!.note).toContain("少計 2 小時");
+    // Must not trip the missing-punch prompt (sheets.ts matches these substrings).
+    expect(records[1]!.note).not.toContain("缺上班打卡");
+    expect(records[1]!.note).not.toContain("缺下班打卡");
+  });
+
+  it("a shift fully absorbed by the daily cap says 未列入計薪", () => {
+    const { records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "09:00"),
+      ev("clock-out", "2026-08-03", "17:00"), // 8hr, fills the cap
+      ev("clock-in", "2026-08-03", "18:00"),
+      ev("clock-out", "2026-08-03", "20:00"),
+    ], false);
+    expect(records[1]!.normal_hours).toBe(0);
+    expect(records[1]!.note).toContain("本段 2 小時 未列入計薪");
+  });
+
+  it("missing punches still produce 0hr + flag", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-03", "10:55"),
+      ev("no-clock-out"),
+    ], false);
+    expect(records[0]!.normal_hours).toBe(0);
+    expect(records[0]!.note).toContain("缺下班打卡");
+    expect(summary.normal_hours).toBe(0);
+  });
+});
+
+describe("V2 analyzer — hourly rule cutover boundary", () => {
+  it("2026-07-31 10:00-18:00 → still splits into two 0hr records", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-07-31", "10:00"),
+      ev("clock-out", "2026-07-31", "18:00"),
+    ], false);
+    expect(records).toHaveLength(2);
+    expect(summary.normal_hours).toBe(0);
+  });
+
+  it("2026-08-01 10:00-18:00 → one record paid 8hr", () => {
+    const { summary, records } = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-01", "10:00"),
+      ev("clock-out", "2026-08-01", "18:00"),
+    ], false);
+    expect(records).toHaveLength(1);
+    expect(summary.normal_hours).toBe(8);
+  });
+
+  it("2026-07-31 16:00-20:30 → per-shift cap 4hr; 2026-08-01 → 4.5hr", () => {
+    const before = analyzeEmployee("B", [
+      ev("clock-in", "2026-07-31", "16:00"),
+      ev("clock-out", "2026-07-31", "20:30"),
+    ], false);
+    const after = analyzeEmployee("B", [
+      ev("clock-in", "2026-08-01", "16:00"),
+      ev("clock-out", "2026-08-01", "20:30"),
+    ], false);
+    expect(before.summary.normal_hours).toBe(4);
+    expect(after.summary.normal_hours).toBe(4.5);
   });
 });

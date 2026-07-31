@@ -4,11 +4,13 @@
  * Key changes from V1:
  * - No automatic overtime calculation (all overtime comes from overtime requests)
  * - Missing punches = 0hr + flag (no default hours)
- * - Full-time: recorded_hours - 2hr (break deduction), cap 8hr
- * - Hourly: actual hours, per-shift cap 4hr, daily cap 8hr
+ * - Full-time: in/out span, cap 8hr (no break deduction)
+ * - Hourly: actual hours, daily cap 8hr
  * - Unified normalize: roundToHalfHour for both in and out
  * - Shift classification simplified: 早班 (< 14:00) / 晚班 (>= 14:00)
  * - Flag when daily total > 8hr 15min (full-time: raw punch diff > 10hr 15min)
+ *
+ * Hourly rules are versioned by record date — see `DAILY_CAP_ONLY_FROM`.
  */
 import type { Event } from "./events";
 import {
@@ -41,6 +43,32 @@ export interface EmployeeSummary {
   overtime_hours: number;
   specials: string[];
   overtime_specials: string[];
+}
+
+/**
+ * Rule cutover for hourly employees. Records dated on/after this use the
+ * daily-cap-only rules; earlier records keep the original per-shift rules so
+ * already-paid months stay reproducible when a supplement punch triggers a
+ * reanalyze of a historical month.
+ *
+ * On/after — no per-shift cap, no full-day split. A single in/out pair is paid
+ * as punched (daily cap 8hr still applies), because the operating rule is now
+ * "punch what you actually worked" — 2.5hr and 4.5hr shifts are both fine, and
+ * breaks are expected to be punched out rather than deducted. A span at or
+ * above `LONG_SPAN_HOURS` gets a note instead of being split, so a genuine long
+ * day is paid while a forgotten mid-day punch pair still surfaces for review.
+ *
+ * Before — per-shift cap 4hr, and an in < 14:00 with out >= 17:00 was split
+ * into 早班缺out + 晚班缺in (both 0hr).
+ */
+export const DAILY_CAP_ONLY_FROM = "2026-08-01";
+
+/** Single in/out span (raw hours) at or above this gets a "check punches" note. */
+const LONG_SPAN_HOURS = 7;
+
+/** True when `date` ("YYYY-MM-DD") falls under the daily-cap-only rules. */
+function isDailyCapOnly(date: string): boolean {
+  return date >= DAILY_CAP_ONLY_FROM;
 }
 
 /** Classify shift based on normalized in time. */
@@ -150,45 +178,59 @@ function handleHourly(
     shift = classifyShift(inNorm!);
     notes.push("缺下班打卡，需人工確認");
   } else {
-    // Both present — check for full-day span (in < 14:00, out >= 17:00).
-    // Heuristic: a single hourly shift caps at 4hr, plus 加時申請 / 上限寬限
-    // can plausibly stretch to ~5hr. Any out >= 17:00 with in < 14:00 is
-    // unlikely to be one shift, so treat it as 早班缺out + 晚班缺in.
-    const inH = inNorm!.getHours() + inNorm!.getMinutes() / 60;
-    const outH = outNorm!.getHours() + outNorm!.getMinutes() / 60;
+    const legacyRules = !isDailyCapOnly(date);
 
-    if (inH < 14 && outH >= 17) {
-      // Early shift: has in, missing out → 0hr + flag
-      addRecord(records, summary, {
-        employee: name, date, shift: "早班",
-        in_raw: inTs ? fmtTimestamp(inTs) : "",
-        in_norm: inNorm ? fmtMinuteStamp(inNorm) : "",
-        out_raw: "", out_norm: "",
-        normal_hours: 0, overtime_hours: 0,
-        note: "早班缺下班打卡，需補打",
-      }, true);
-      // Late shift: missing in, has out → 0hr + flag
-      addRecord(records, summary, {
-        employee: name, date, shift: "晚班",
-        in_raw: "", in_norm: "",
-        out_raw: outTs ? fmtTimestamp(outTs) : "",
-        out_norm: outNorm ? fmtMinuteStamp(outNorm) : "",
-        normal_hours: 0, overtime_hours: 0,
-        note: "晚班缺上班打卡，需補打",
-      }, true);
-      return;
+    if (legacyRules) {
+      // Pre-cutover: check for full-day span (in < 14:00, out >= 17:00).
+      // Heuristic rested on the per-shift 4hr cap — a single shift plus
+      // 加時申請 / 上限寬限 stretched to ~5hr at most, so out >= 17:00 with
+      // in < 14:00 was read as 早班缺out + 晚班缺in rather than one long shift.
+      const inH = inNorm!.getHours() + inNorm!.getMinutes() / 60;
+      const outH = outNorm!.getHours() + outNorm!.getMinutes() / 60;
+
+      if (inH < 14 && outH >= 17) {
+        // Early shift: has in, missing out → 0hr + flag
+        addRecord(records, summary, {
+          employee: name, date, shift: "早班",
+          in_raw: inTs ? fmtTimestamp(inTs) : "",
+          in_norm: inNorm ? fmtMinuteStamp(inNorm) : "",
+          out_raw: "", out_norm: "",
+          normal_hours: 0, overtime_hours: 0,
+          note: "早班缺下班打卡，需補打",
+        }, true);
+        // Late shift: missing in, has out → 0hr + flag
+        addRecord(records, summary, {
+          employee: name, date, shift: "晚班",
+          in_raw: "", in_norm: "",
+          out_raw: outTs ? fmtTimestamp(outTs) : "",
+          out_norm: outNorm ? fmtMinuteStamp(outNorm) : "",
+          normal_hours: 0, overtime_hours: 0,
+          note: "晚班缺上班打卡，需補打",
+        }, true);
+        return;
+      }
     }
 
-    // Normal single-shift: pay uses normalized hours (cap applied later in
-    // applyDailyCapForPt), but the per-shift over-cap flag uses raw so the
-    // message matches the employee's actual punches.
+    // Pay uses normalized hours (caps applied later in applyDailyCapForPt),
+    // but the flags below use raw so their message matches the employee's
+    // actual punches.
     shift = classifyShift(inNorm!);
-    const worked = Math.max((outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000, 0);
-    normal = worked;
-
+    normal = Math.max((outNorm!.getTime() - inNorm!.getTime()) / 3600 / 1000, 0);
     rawWorked = Math.max((outTs!.getTime() - inTs!.getTime()) / 3600 / 1000, 0);
-    if (rawWorked >= 4.25) {
-      notes.push(`${shift}，實際 ${fmtHoursMinutes(rawWorked)}，上限 4 小時`);
+
+    if (legacyRules) {
+      if (rawWorked >= 4.25) {
+        notes.push(`${shift}，實際 ${fmtHoursMinutes(rawWorked)}，上限 4 小時`);
+      }
+    } else if (rawWorked >= LONG_SPAN_HOURS) {
+      // Replaces the full-day split: the hours are paid (up to the daily cap),
+      // but a span this long is either a genuine long day needing an overtime
+      // request or a forgotten out/in pair in the middle. Wording deliberately
+      // avoids "缺上班打卡"/"缺下班打卡" — getMissingPunches matches on those
+      // substrings and would otherwise raise a phantom missing-punch prompt.
+      notes.push(
+        `單段 ${fmtHoursMinutes(rawWorked)}（達 ${LONG_SPAN_HOURS} 小時以上），請確認是否漏打卡或需申請加班`,
+      );
     }
   }
 
@@ -246,12 +288,27 @@ export function applyDailyCapForPt(
       );
     }
 
-    // Apply per-shift cap (4hr) then daily cap (8hr)
+    // Apply per-shift cap (legacy dates only) then daily cap (8hr).
+    // The daily cap is first-come-first-served in punch order, so on an
+    // over-8hr day the later shift is the one truncated.
+    const perShiftCap = isDailyCapOnly(date) ? Infinity : 4.0;
     let remainingNormal = 8.0;
     for (const r of dayRecs) {
-      r.normal_hours = Math.min(r.normal_hours, 4.0); // per-shift cap
-      r.normal_hours = Math.min(r.normal_hours, remainingNormal); // daily cap
+      const beforeCap = Math.min(r.normal_hours, perShiftCap);
+      r.normal_hours = Math.min(beforeCap, remainingNormal); // daily cap
       remainingNormal = Math.max(0, remainingNormal - r.normal_hours);
+
+      // Note on the record that actually lost hours, not just in the summary —
+      // otherwise a shift silently shows fewer hours than it was punched for
+      // and the employee has no way to see why on their own row.
+      const lost = beforeCap - r.normal_hours;
+      if (lost > 1e-9) {
+        const note =
+          r.normal_hours <= 1e-9
+            ? `本日已達 8 小時上限，本段 ${fmtHoursMinutes(beforeCap)} 未列入計薪，請確認是否需申請加班`
+            : `本日已達 8 小時上限，本段 ${fmtHoursMinutes(beforeCap)} 僅計 ${fmtHoursMinutes(r.normal_hours)}（少計 ${fmtHoursMinutes(lost)}），請確認是否需申請加班`;
+        r.note = r.note ? `${r.note}；${note}` : note;
+      }
     }
 
     const cappedTotal = dayRecs.reduce((acc, r) => acc + r.normal_hours, 0);

@@ -16,11 +16,15 @@ Rules that aren't obvious from the code. Everything else (stack, tabs, env vars,
 
 ## Analyzer
 
-- **V2 rules** (2026-04-20): no automatic overtime, missing punch = 0hr + flag, full-time = in/out span capped at 8hr (no break deduction; short days paid in full, the cap absorbs presence beyond 8hr — see 2026-06-16 change replacing the earlier flat −2hr break that under-paid short shifts), per-shift cap 4hr (hourly), daily cap 8hr. All overtime comes from overtime requests (not yet built).
+- **V2 rules** (2026-04-20): no automatic overtime, missing punch = 0hr + flag, full-time = in/out span capped at 8hr (no break deduction; short days paid in full, the cap absorbs presence beyond 8hr — see 2026-06-16 change replacing the earlier flat −2hr break that under-paid short shifts), daily cap 8hr (hourly). All overtime comes from overtime requests (not yet built).
+- **Hourly rules are versioned by record date** via `DAILY_CAP_ONLY_FROM` in `analyzer.ts` (currently `2026-08-01`). Records **before** that date keep the original per-shift cap 4hr + full-day split; records **on/after** have no per-shift cap and no split. Already-paid months must stay reproducible — a supplement punch reanalyzes the whole month, so never retroactively change how a past month computes. When a rule changes again, add a new cutover constant rather than editing the old branch.
+- **Post-cutover hourly**: a single in/out pair is paid as punched (2.5hr / 4.5hr shifts are all fine), daily cap 8hr, applied first-come-first-served in punch order so the *later* shift is the one truncated on an over-8hr day. Breaks are expected to be punched out, not deducted.
+- **Daily-cap truncation is noted on the record that lost the hours**, not only in the summary — a shift silently showing fewer hours than it was punched for is unreadable to the employee. Same substring rule as the long-span note: never `缺上班打卡` / `缺下班打卡`.
+- **Long-span note**: post-cutover, a single pair with raw span >= 7hr gets a note instead of being split — it is either a genuine long day (needs an overtime request) or a forgotten mid-day out/in pair. **The note must never contain `缺上班打卡` / `缺下班打卡`**: `getMissingPunches` and `loadEmployeeStatus` match on those substrings and would raise a phantom 缺卡 prompt on a record that has both punches.
 - **`isFullTime` must come from `employees.role`.** Never hardcode employee names anywhere in analyzer-related code paths.
-- **Shifts**: only 早班 / 晚班 (no sub-categories). Classification based on `normalizedIn < 14:00`.
-- **Shift windows**: 早班 9:00-15:00, 晚班 15:00-21:00 (normal ±1hr buffer). If hourly employee's `normIn < 14:00` and `normOut >= 15:00`, it is treated as two missing punches (早班缺out + 晚班缺in), not a single long shift.
-- **Overtime flag**: uses **actual worked hours** (before cap) to check > 8hr 15min (hourly) / > 10hr 15min (full-time). Per-shift cap and daily cap are applied after the flag check.
+- **Shifts**: only 早班 / 晚班 (no sub-categories). Classification based on `normalizedIn < 14:00`. Post-cutover this is **purely descriptive** — it feeds the 明細 sheet, the 缺卡 prompt label, and `defaultSupTime` in `page.tsx`, but no longer affects any hours calculation.
+- **Shift windows** (pre-cutover only): 早班 9:00-15:00, 晚班 15:00-21:00 (normal ±1hr buffer). If hourly employee's `normIn < 14:00` and `normOut >= 17:00`, it is treated as two missing punches (早班缺out + 晚班缺in), not a single long shift.
+- **Overtime flag**: uses **actual worked hours** (before cap) to check > 8hr 15min (hourly) / > 10hr 15min (full-time). Caps are applied after the flag check.
 - **Normalize**: unified `roundToHalfHour` for both in and out. No grace period, no directional bias.
 - **Python parity is no longer a goal.** V2 intentionally diverges from the Python analyzer. The parity test has been replaced with V2-specific tests.
 
