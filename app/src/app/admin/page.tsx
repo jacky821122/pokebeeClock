@@ -21,9 +21,6 @@ const SECRET_KEY = "pokebee_admin_secret";
 
 export default function AdminPage() {
   const [secret, setSecret] = useState<string | null>(() => {
-    // BYPASS: feature/hourly-daily-cap-only preview convenience. Remove before merging.
-    if (process.env.NEXT_PUBLIC_BYPASS_AUTH === "1") return "preview";
-
     if (typeof window === "undefined") return null;
     return sessionStorage.getItem(SECRET_KEY);
   });

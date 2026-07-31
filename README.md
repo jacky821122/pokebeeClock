@@ -44,6 +44,7 @@ The analyzer calculates hours from punch records with these rules:
 - **Full-time**: `norm_out - norm_in`, cap 8hr (no break deduction). Flag if raw diff > 10hr 15min.
 - **Hourly**: `norm_out - norm_in`, daily cap 8hr (first-come-first-served in punch order). Flag uses **actual hours** (before cap) > 8hr 15min.
 - **Long-span note** (hourly): a single pair with raw span >= 7hr is paid but flagged — either a genuine long day needing an overtime request, or a forgotten mid-day out/in pair.
+- **Daily-cap note** (hourly): a shift truncated by the 8hr daily cap carries a note on its own record stating the punched span, the hours paid, and the shortfall — not just a summary flag.
 - **Missing punch**: 0hr + flag (no default hours assumed).
 - **Overtime**: never auto-calculated. All overtime comes from overtime requests.
 - **Shifts**: 早班 (`normalizedIn < 14:00`) / 晚班 (`>= 14:00`). Descriptive only — no effect on hours.
