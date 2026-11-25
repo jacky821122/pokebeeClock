@@ -29,6 +29,8 @@ function getAuth(): InstanceType<typeof google.auth.GoogleAuth> {
 
 let cachedSheetsClient: ReturnType<typeof google.sheets> | null = null;
 
+const SHEETS_TIMEOUT_MS = 8000;
+
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
 
@@ -49,7 +51,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 
 function getSheets() {
   if (!cachedSheetsClient) {
-    cachedSheetsClient = google.sheets({ version: "v4", auth: getAuth() });
+    // Per-request timeout: without it a hung Sheets backend (2026-11-25 incident)
+    // holds the function until Vercel's 300s limit instead of failing fast.
+    cachedSheetsClient = google.sheets({ version: "v4", auth: getAuth(), timeout: SHEETS_TIMEOUT_MS });
   }
   return cachedSheetsClient;
 }
